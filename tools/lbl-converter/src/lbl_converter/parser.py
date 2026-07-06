@@ -210,7 +210,5 @@ def resolve_redirects(parsed_files, warnings):
             current = target
 
         resolved[p.path] = effective
-        if effective is not None:
-            # Record the chain so source metadata can be merged.
-            resolved[p.path + "\0chain"] = chain + []
-    return resolved
+        chains[p.path] = chain
+    return resolved, chains

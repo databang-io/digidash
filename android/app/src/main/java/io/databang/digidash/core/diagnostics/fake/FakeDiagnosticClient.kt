@@ -147,8 +147,10 @@ class FakeDiagnosticClient(
             {
               "ecu": "037906024AG",
               "blocks": [
-                { "group": 1, "fields": ["920", "88", "13.9", "Idle"] },
-                { "group": 2, "fields": ["24", "2.6", "Active", "8"] }
+                { "group": 1, "fields": ["920", "21", "88", "2.6"] },
+                { "group": 2, "fields": ["920", "24", "10", "2.6"] },
+                { "group": 5, "fields": ["920", "2.5", "202", "2.6"] },
+                { "group": 9, "fields": ["920", "41", "253", "52"] }
               ]
             }
         """.trimIndent()

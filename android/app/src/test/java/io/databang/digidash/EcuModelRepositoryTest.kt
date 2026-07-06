@@ -59,8 +59,8 @@ class EcuModelRepositoryTest {
         val keys = model.tripCardFields().map { it.second.key }
         assertEquals(
             listOf(
-                "rpm", "coolant_temp", "battery_voltage", "idle_state",
-                "injection_time", "lambda_state", "ignition_advance",
+                "rpm", "coolant_temp", "intake_air_temp", "injection_time",
+                "engine_load", "throttle_angle", "lambda_signal",
             ),
             keys,
         )

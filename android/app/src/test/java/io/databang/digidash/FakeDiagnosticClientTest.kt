@@ -31,7 +31,7 @@ class FakeDiagnosticClientTest {
         val block = client.readMeasuringBlock(1).getOrThrow()
         assertEquals(4, block.fields.size)
         assertEquals("920", block.fields[0].raw)
-        assertEquals("Idle", block.fields[3].raw)
+        assertEquals("2.6", block.fields[3].raw)
     }
 
     @Test
@@ -39,7 +39,7 @@ class FakeDiagnosticClientTest {
         val client = client()
         client.connect(ConnectionConfig())
         val block = client.readMeasuringBlock(2).getOrThrow()
-        assertEquals("2.6", block.fields[1].raw)
+        assertEquals("24", block.fields[1].raw)
     }
 
     @Test
