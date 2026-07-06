@@ -114,7 +114,7 @@
         "index": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 8
+          "maximum": 10
         },
         "key": {
           "type": "string"

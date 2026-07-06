@@ -18,29 +18,31 @@ sys.path.insert(0, os.path.join(
 from lbl_converter import cli, model, parser  # noqa: E402
 
 
-# Synthetic label content (invented, not Ross-Tech data).
+# Synthetic label content in the real VCDS format (invented data).
 BASIC_LBL = "\n".join([
     "; synthetic test label file",
     "; another comment line",
     "A01,Some address line",
     "C05,Coding hint line",
     "L1,Login hint line",
-    "001.0,Engine data",
-    "001.1,Engine speed,rpm,800-900",
-    "001.2,Coolant temperature,°C",
-    "001.3,Battery voltage,V,12.0-14.5",
-    "001.4,Idle switch state",
-    "002.0,Mixture data",
-    "002.1,Injection time,ms",
-    "002.2,Lambda value",
+    "0,0,General data",
+    "0,1,Undocumented,039",
+    "1,0,Engine data",
+    "1,1,Engine Speed,rpm,800-900",
+    "1,2,Coolant,Temperature,must rise smoothly",
+    "1,3,Battery Voltage,V,12.0-14.5",
+    "1,4,Idle Switch State",
+    "2,0,Mixture data",
+    "2,1,Injection Time,ms",
+    "2,2,Lambda,Value",
     "",
 ])
 
 BASE_LBL = "\n".join([
     "; synthetic base label file",
-    "001.0,Base engine data",
-    "001.1,Engine speed,rpm",
-    "001.2,Coolant temperature,°C",
+    "1,0,Base engine data",
+    "1,1,Engine Speed,rpm",
+    "1,2,Coolant,Temperature",
     "",
 ])
 
@@ -87,9 +89,11 @@ class ConverterTestCase(unittest.TestCase):
         with open(os.path.join(self.out, rel), encoding="utf-8") as fh:
             return json.load(fh)
 
+    def warnings_list(self):
+        return self.read_json("conversion-warnings.json")["warnings"]
+
     def warnings_codes(self):
-        data = self.read_json("conversion-warnings.json")
-        return [w["code"] for w in data["warnings"]]
+        return [w["code"] for w in self.warnings_list()]
 
 
 class TestBasicParsing(ConverterTestCase):
@@ -99,25 +103,67 @@ class TestBasicParsing(ConverterTestCase):
         m = self.read_json("vw/037906024AG.json")
         self.assertEqual(m["ecu_part_number"], "037906024AG")
         self.assertEqual(m["ecu_model_version"], 1)
-        self.assertIn("001", m["groups"])
+        # group 0 -> "000", numeric token2 goes to notes not name/unit
+        g0 = m["groups"]["000"]
+        self.assertEqual(g0["label"], "General data")
+        self.assertEqual(g0["fields"][0]["name"], "Undocumented")
+        self.assertEqual(g0["fields"][0]["unit"], "")
+        self.assertEqual(g0["fields"][0]["notes"], "039")
         g1 = m["groups"]["001"]
         self.assertEqual(g1["label"], "Engine data")
         self.assertEqual(len(g1["fields"]), 4)
         f1 = g1["fields"][0]
         self.assertEqual(f1["index"], 1)
-        self.assertEqual(f1["name"], "Engine speed")
+        self.assertEqual(f1["name"], "Engine Speed")
         self.assertEqual(f1["unit"], "rpm")
         self.assertEqual(f1["key"], "engine_speed")
         self.assertEqual(f1["formula"], {"type": "raw"})
         self.assertEqual(f1["confidence"], "medium")
         self.assertEqual(f1["notes"], "800-900")
-        # unit heuristic: degree sign token
-        self.assertEqual(g1["fields"][1]["unit"], "°C")
-        self.assertIn("002", m["groups"])
+        # two-part name split across comma tokens is joined
+        f2 = g1["fields"][1]
+        self.assertEqual(f2["name"], "Coolant Temperature")
+        self.assertEqual(f2["key"], "coolant_temperature")
+        self.assertEqual(f2["notes"], "must rise smoothly")
+        self.assertEqual(g1["fields"][2]["unit"], "V")
+        g2 = m["groups"]["002"]
+        self.assertEqual(g2["fields"][0]["unit"], "ms")
+        self.assertEqual(g2["fields"][1]["name"], "Lambda Value")
         # source metadata
         self.assertEqual(m["source"]["type"], "lbl-import")
         self.assertEqual(m["source"]["confidence"], "medium")
         self.assertIn("037-906-024-AG.LBL", m["source"]["notes"])
+
+    def test_empty_token2_goes_to_notes(self):
+        lbl = "1,1,Engine Speed,,Idle Specification 750-850 RPM\n"
+        self.run_cli({"037-906-024-AG.LBL": lbl})
+        f = self.read_json(
+            "vw/037906024AG.json")["groups"]["001"]["fields"][0]
+        self.assertEqual(f["name"], "Engine Speed")
+        self.assertEqual(f["unit"], "")
+        self.assertEqual(f["notes"], "Idle Specification 750-850 RPM")
+
+    def test_zero_padded_group_numbers(self):
+        lbl = "016,1,Some Value,rpm\n16,2,Other Value\n"
+        self.run_cli({"037-906-024-AG.LBL": lbl})
+        m = self.read_json("vw/037906024AG.json")
+        self.assertEqual(list(m["groups"]), ["016"])
+        self.assertEqual(len(m["groups"]["016"]["fields"]), 2)
+
+    def test_legacy_dot_format_still_parsed(self):
+        lbl = "\n".join([
+            "001.0,Engine data",
+            "001.1,Engine speed,rpm,800-900",
+            "001.2,Coolant temperature,°C",
+            "",
+        ])
+        rc = self.run_cli({"037-906-024-AG.LBL": lbl})
+        self.assertEqual(rc, 0)
+        g1 = self.read_json("vw/037906024AG.json")["groups"]["001"]
+        self.assertEqual(g1["label"], "Engine data")
+        self.assertEqual(g1["fields"][0]["name"], "Engine speed")
+        self.assertEqual(g1["fields"][0]["unit"], "rpm")
+        self.assertEqual(g1["fields"][1]["unit"], "°C")
 
     def test_comments_and_ignored_lines_counted(self):
         self.run_cli({"037-906-024-AG.LBL": BASIC_LBL})
@@ -130,9 +176,9 @@ class TestBasicParsing(ConverterTestCase):
 
     def test_field_key_dedupe(self):
         lbl = "\n".join([
-            "003.1,Temp Sensor,°C",
-            "003.2,Temp Sensor,°C",
-            "003.3,???",
+            "3,1,Temp Sensor,°C",
+            "3,2,Temp Sensor,°C",
+            "3,3,???",
             "",
         ])
         self.run_cli({"037-906-024-AG.LBL": lbl})
@@ -143,11 +189,33 @@ class TestBasicParsing(ConverterTestCase):
         # non-sluggable name falls back to raw_GGG_F
         self.assertEqual(fields[2]["key"], "raw_003_3")
 
+    def test_high_field_indexes_parsed_but_excluded_from_model(self):
+        # Indexes up to 10 are kept (group 000 has 10 raw fields on KWP1281);
+        # anything above 10 is excluded with one aggregated info warning.
+        lbl = "\n".join([
+            "0,0,General data",
+            "0,8,Value Eight",
+            "0,9,Value Nine",
+            "0,10,Value Ten",
+            "0,11,Value Eleven",
+            "",
+        ])
+        rc = self.run_cli({"037-906-024-AG.LBL": lbl})
+        self.assertEqual(rc, 0)
+        m = self.read_json("vw/037906024AG.json")
+        indexes = [f["index"] for f in m["groups"]["000"]["fields"]]
+        self.assertEqual(indexes, [8, 9, 10])
+        w = [x for x in self.warnings_list()
+             if x["code"] == "FIELD_INDEX_OUT_OF_RANGE"]
+        self.assertEqual(len(w), 1)
+        self.assertEqual(w[0]["level"], "info")
+        self.assertIn("1 field(s)", w[0]["message"])
+
 
 class TestEncoding(ConverterTestCase):
     def test_cp1252_file(self):
         # 0xB0 = degree sign in cp1252, invalid as UTF-8 start of sequence
-        content = "001.1,Öltemperatur,°C\n".encode("cp1252")
+        content = "1,1,Öltemperatur,°C\n".encode("cp1252")
         rc = self.run_cli({"037-906-024-AG.LBL": content})
         self.assertEqual(rc, 0)
         m = self.read_json("vw/037906024AG.json")
@@ -156,12 +224,12 @@ class TestEncoding(ConverterTestCase):
         self.assertEqual(f["unit"], "°C")
 
     def test_utf8_bom_file(self):
-        content = b"\xef\xbb\xbf001.1,Engine speed,rpm\n"
+        content = b"\xef\xbb\xbf1,1,Engine Speed,rpm\n"
         rc = self.run_cli({"037-906-024-AG.LBL": content})
         self.assertEqual(rc, 0)
         m = self.read_json("vw/037906024AG.json")
         self.assertEqual(m["groups"]["001"]["fields"][0]["name"],
-                         "Engine speed")
+                         "Engine Speed")
 
     def test_decode_fallback_order(self):
         self.assertEqual(parser.decode_tolerant(b"\xef\xbb\xbfabc")[1],
@@ -177,14 +245,16 @@ class TestEncoding(ConverterTestCase):
 class TestRedirects(ConverterTestCase):
     def test_redirect_resolution(self):
         rc = self.run_cli({
-            "037-906-024-AG.LBL": "; synthetic\nREDIRECT,037-906-024-AB.LBL,hint\n",
+            "037-906-024-AG.LBL":
+                "; synthetic\n"
+                "REDIRECT,037-906-024-AB.LBL,H,T,AA;  PG engine code\n",
             "037-906-024-AB.LBL": BASIC_LBL,
         })
         self.assertEqual(rc, 0)
         m = self.read_json("vw/037906024AG.json")
         self.assertIn("001", m["groups"])
         self.assertEqual(m["groups"]["001"]["fields"][0]["name"],
-                         "Engine speed")
+                         "Engine Speed")
         # merged source metadata mentions the chain
         self.assertIn("037-906-024-AG.LBL", m["source"]["notes"])
         self.assertIn("037-906-024-AB.LBL", m["source"]["notes"])
@@ -200,6 +270,20 @@ class TestRedirects(ConverterTestCase):
         self.assertEqual(rc, 0)
         self.assertTrue(os.path.exists(
             os.path.join(self.out, "vw/037906024AG.json")))
+
+    def test_redirect_to_wildcard_hub(self):
+        rc = self.run_cli({
+            "01M-927-733.LBL": "REDIRECT,02E-300-0xx.LBL\n",
+            "02E-300-0xx.LBL": BASIC_LBL,
+        })
+        self.assertEqual(rc, 0)
+        # the concrete part number gets a model from the hub content
+        m = self.read_json("vw/01M927733.json")
+        self.assertIn("001", m["groups"])
+        # the wildcard hub itself does not become a model
+        self.assertFalse(os.path.exists(
+            os.path.join(self.out, "vw/02E3000XX.json")))
+        self.assertIn("NON_MODEL_FILE", self.warnings_codes())
 
     def test_redirect_cycle_warning_no_crash(self):
         rc = self.run_cli({
@@ -226,21 +310,31 @@ class TestTolerance(ConverterTestCase):
             "junk.LBL": b"\x00\x01\x02garbage without structure\xff\xfe",
         })
         self.assertEqual(rc, 0)
-        codes = self.warnings_codes()
-        self.assertIn("UNPARSABLE_FILE", codes)
+        self.assertIn("UNPARSABLE_FILE", self.warnings_codes())
         # good file still converted
         self.assertTrue(os.path.exists(
             os.path.join(self.out, "vw/037906024AG.json")))
 
-    def test_invalid_part_number_filename_skipped_with_warning(self):
+    def test_helper_and_wildcard_files_single_info_warning(self):
         rc = self.run_cli({
-            "notes.LBL": BASIC_LBL,
+            "00-01.LBL": "; addressing helper\nREDIRECT,MISSING.LBL\n",
+            "1C-01.LBL": BASE_LBL,
+            "02E-300-0xx.LBL": BASE_LBL,
             "037-906-024-AG.LBL": BASIC_LBL,
         })
         self.assertEqual(rc, 0)
-        self.assertIn("INVALID_PART_NUMBER", self.warnings_codes())
-        self.assertFalse(os.path.exists(
-            os.path.join(self.out, "vw/NOTES.json")))
+        infos = [w for w in self.warnings_list()
+                 if w["code"] == "NON_MODEL_FILE"]
+        # one aggregated info-level warning, not one per file
+        self.assertEqual(len(infos), 1)
+        self.assertEqual(infos[0]["level"], "info")
+        self.assertIn("3 wildcard/helper", infos[0]["message"])
+        # helper/wildcard files produced no models
+        for pn in ("0001", "1C01", "02E3000XX"):
+            self.assertFalse(os.path.exists(
+                os.path.join(self.out, "vw/%s.json" % pn)), pn)
+        self.assertTrue(os.path.exists(
+            os.path.join(self.out, "vw/037906024AG.json")))
 
 
 class TestTarget(ConverterTestCase):
@@ -350,7 +444,22 @@ class TestModelHelpers(unittest.TestCase):
             model.part_number_from_filename("037 906 024.lbl"),
             "037906024")
         self.assertIsNone(model.part_number_from_filename("notes.LBL"))
+        self.assertIsNone(model.part_number_from_filename("00-01.lbl"))
         self.assertIsNone(model.part_number_from_filename("übersicht.LBL"))
+
+    def test_is_wildcard_filename(self):
+        self.assertTrue(model.is_wildcard_filename("02E-300-0xx.lbl"))
+        self.assertTrue(model.is_wildcard_filename("1J0-919-xxx-17.lbl"))
+        self.assertTrue(model.is_wildcard_filename("1Ux-919-xxx-17.lbl"))
+        # lone lowercase x placeholders in mixed-case stems
+        self.assertTrue(model.is_wildcard_filename("1C0-920-x2x.lbl"))
+        self.assertTrue(model.is_wildcard_filename("1C0-919-95x.lbl"))
+        self.assertFalse(model.is_wildcard_filename("01M-927-733.lbl"))
+        self.assertFalse(model.is_wildcard_filename("037-906-024-AG.LBL"))
+        # uppercase X is a real suffix letter, not a wildcard
+        self.assertFalse(model.is_wildcard_filename("022-906-032-BMX.lbl"))
+        # all-lowercase filenames are not treated as wildcards
+        self.assertFalse(model.is_wildcard_filename("022-906-032-bmx.lbl"))
 
     def test_slugify(self):
         self.assertEqual(model.slugify("Engine speed"), "engine_speed")

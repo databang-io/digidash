@@ -36,12 +36,17 @@ def normalize_part_number(value):
 def is_wildcard_filename(filename):
     """True for wildcard label filenames like ``02E-300-0xx.lbl``.
 
-    Ross-Tech uses runs of ``x``/``?`` as placeholders in hub files that
-    cover several part numbers; such files must not yield a model of
-    their own.
+    Ross-Tech uses lowercase ``x`` (single or runs, e.g. ``1C0-920-x2x``)
+    and ``?`` as placeholders in hub files that cover several part
+    numbers; such files must not yield a model of their own. A lone
+    lowercase ``x`` only counts as a placeholder when the stem is
+    otherwise mixed-case (real suffix letters are uppercase, e.g.
+    ``022-906-032-BMX``).
     """
     stem = os.path.splitext(os.path.basename(filename))[0]
-    return bool(re.search(r"xx|\?", stem, re.IGNORECASE))
+    if re.search(r"xx|\?", stem, re.IGNORECASE):
+        return True
+    return "x" in stem and stem != stem.lower()
 
 
 def slugify(name):
@@ -57,7 +62,8 @@ def build_model(part_number, parsed, confidence, source_notes,
     """Build an ECU Model dict from a resolved ParsedLbl.
 
     Returns ``(model, skipped_fields)`` where ``skipped_fields`` counts
-    parsed fields with index > 8 that the schema cannot represent.
+    parsed fields with index > 10 that the schema cannot represent
+    (group 000 carries 10 raw fields on KWP1281 ECUs).
     """
     groups = {}
     skipped_fields = 0
@@ -67,7 +73,7 @@ def build_model(part_number, parsed, confidence, source_notes,
         fields = []
         key_counts = {}
         for idx in sorted(pgroup.fields):
-            if idx > 8:
+            if idx > 10:
                 skipped_fields += 1
                 continue
             name, unit, extra = pgroup.fields[idx]
@@ -188,8 +194,8 @@ def validate_model(model):
                 if fkey not in field:
                     errors.append("%s: missing %r" % (fprefix, fkey))
             idx = field.get("index")
-            if not isinstance(idx, int) or not 1 <= idx <= 8:
-                errors.append("%s: index must be an integer 1-8" % fprefix)
+            if not isinstance(idx, int) or not 1 <= idx <= 10:
+                errors.append("%s: index must be an integer 1-10" % fprefix)
             formula = field.get("formula")
             if not isinstance(formula, dict) or "type" not in formula:
                 errors.append("%s: formula must be an object with 'type'"

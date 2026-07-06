@@ -46,7 +46,10 @@ converted_ecu_models/
 
 - Encoding fallback: UTF-8 (BOM aware) → Windows-1252 → ISO-8859-1; never crashes on undecodable bytes.
 - Redirect lines (`REDIRECT,other.lbl,...`) are followed case-insensitively, with cycle detection and missing-target warnings.
-- Only measuring-block lines (`GGG.F,name[,unit][,extra]`) are converted; other lines are ignored silently but counted in the report.
+- Only measuring-block lines are converted, in both the real VCDS format `G,F,name[,unit-or-name-part][,spec/notes]` (group 0-255, zero-padded or not; field 0-25; field 0 = group label) and the legacy `GGG.F,name[,unit][,extra]` format; other lines are ignored silently but counted in the report.
+- The token after the field name becomes the unit only when it matches a unit heuristic (°C, %, V, ms, rpm, km/h, ...); a digit-free letters/spaces token is joined to the name (VCDS often splits names as `Coolant,Temperature`); remaining tokens are kept as `notes`.
+- Wildcard hub files (`02E-300-0xx.lbl`, `1C0-920-x2x.lbl`) and addressing helpers (`00-01.lbl`) are parsed (they can be redirect hubs) but never yield a model; they are reported once, aggregated, at info level.
+- Fields with index > 8 are parsed but excluded from models (the schema supports indexes 1-8), reported as a single aggregated info warning.
 - Formulas are always `{"type": "raw"}` — no conversions are invented.
 - Field confidence is `medium` for exact part-number label files, `low` for models inferred from a base file (e.g. target `037906024AG` inferred from `037-906-024.LBL`, recorded in `compatibility.inferred_from`).
 - Generated models are structurally validated against the requirements of `schemas/ecu-model.schema.json`; failures become warnings and the model is excluded.

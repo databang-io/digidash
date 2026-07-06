@@ -127,8 +127,8 @@ def convert(input_zip, output_dir, target=None):
     if skipped_field_total:
         warnings.append(report_mod.make_warning(
             None, None, "FIELD_INDEX_OUT_OF_RANGE",
-            "%d field(s) with index > 8 across %d file(s) excluded from "
-            "models (schema supports indexes 1-8)"
+            "%d field(s) with index > 10 across %d file(s) excluded from "
+            "models (schema supports indexes 1-10)"
             % (skipped_field_total, skipped_field_files),
             level="info"))
 
