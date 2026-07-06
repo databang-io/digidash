@@ -8,6 +8,7 @@ lifecycle = "2.8.7"
 navigation = "2.8.5"
 serializationJson = "1.7.3"
 coroutines = "1.9.0"
+carApp = "1.4.0"
 junit = "4.13.2"
 
 [libraries]
@@ -26,6 +27,7 @@ androidx-navigation-compose = { group = "androidx.navigation", name = "navigatio
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serializationJson" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
+androidx-car-app = { group = "androidx.car.app", name = "app", version.ref = "carApp" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]

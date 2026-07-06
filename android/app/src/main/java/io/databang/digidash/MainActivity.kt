@@ -46,11 +46,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val container = AppContainer(applicationContext)
+        val app = application as DigiDashApplication
         setContent {
             DigiDashTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    DigiDashApp(container)
+                    DigiDashApp(app.container, app.sessionHolder)
                 }
             }
         }
@@ -71,8 +71,8 @@ private enum class Destination(
 }
 
 @Composable
-fun DigiDashApp(container: AppContainer) {
-    val viewModel: AppViewModel = viewModel(factory = AppViewModel.factory(container))
+fun DigiDashApp(container: AppContainer, sessionHolder: SessionHolder) {
+    val viewModel: AppViewModel = viewModel(factory = AppViewModel.factory(container, sessionHolder))
     val state by viewModel.ui.collectAsState()
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()

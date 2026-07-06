@@ -71,20 +71,13 @@ data class IgnitionState(
     val basicSettingsActive: Boolean = false,
 )
 
-class AppViewModel(private val container: AppContainer) : ViewModel() {
+class AppViewModel(
+    private val container: AppContainer,
+    private val sessionHolder: SessionHolder,
+) : ViewModel() {
 
-    private val session = DiagnosticSessionRepository(
-        clientProvider = { container.diagnosticClient },
-        modelRepositoryProvider = { container.modelRepository() },
-        interpreter = container.interpreter,
-        scope = viewModelScope,
-    )
-
-    private val tripLog = TripLogController(
-        session = session,
-        logRepository = container.logRepository,
-        scope = viewModelScope,
-    )
+    private val session = sessionHolder.session
+    private val tripLog = sessionHolder.tripLog
 
     private val _ui = MutableStateFlow(
         AppUiState(
@@ -397,11 +390,11 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     companion object {
         private const val STALE_AFTER_MILLIS = 5_000L
 
-        fun factory(container: AppContainer): ViewModelProvider.Factory =
+        fun factory(container: AppContainer, sessionHolder: SessionHolder): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    AppViewModel(container) as T
+                    AppViewModel(container, sessionHolder) as T
             }
     }
 }
