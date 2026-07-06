@@ -229,6 +229,34 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch { session.readGroupOnce(group) }
     }
 
+    /**
+     * Read every model group once, then write a JSON debug capture (identity +
+     * groups + DTCs). Returns the file path via [onReady] for sharing.
+     */
+    fun exportCapture(onReady: (String) -> Unit) {
+        viewModelScope.launch {
+            _ui.value.availableGroups.forEach { session.readGroupOnce(it) }
+            val json = io.databang.digidash.core.logging.CaptureExporter.buildJson(
+                identity = session.identity.value,
+                modelName = session.model.value?.displayName,
+                measurements = session.measurements.value.values,
+                dtcs = session.dtcs.value,
+                isoTimestamp = isoNow(),
+            )
+            val file = container.logRepository.writeCapture(compactTimestamp(), json)
+            refreshLogs()
+            onReady(file.absolutePath)
+        }
+    }
+
+    private fun isoNow(): String =
+        java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.US)
+            .format(java.util.Date())
+
+    private fun compactTimestamp(): String =
+        java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US)
+            .format(java.util.Date())
+
     // --- Settings / dongle ---
 
     fun setScenario(scenario: FakeScenario) {

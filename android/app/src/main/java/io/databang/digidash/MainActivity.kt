@@ -139,6 +139,7 @@ fun DigiDashApp(container: AppContainer) {
                     onRemoteRepo = viewModel::setRemoteRepo,
                     onReadGroup = viewModel::readGroup,
                     onToggleRealBackend = viewModel::setUseRealBackend,
+                    onExportCapture = viewModel::exportCapture,
                 )
             }
         }

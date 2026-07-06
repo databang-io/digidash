@@ -36,4 +36,11 @@ class LogRepository(private val context: Context) {
 
     fun delete(logFile: LogFile): Boolean =
         runCatching { File(logFile.path).delete() }.getOrDefault(false)
+
+    /** Write a debug capture JSON and return the created file. */
+    fun writeCapture(compactTimestamp: String, json: String): File {
+        val file = File(dir, CaptureExporter.fileName(compactTimestamp))
+        file.writeText(json)
+        return file
+    }
 }

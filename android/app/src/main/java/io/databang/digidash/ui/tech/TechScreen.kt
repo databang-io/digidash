@@ -46,6 +46,7 @@ fun TechScreen(
     onRemoteRepo: (url: String, enabled: Boolean) -> Unit,
     onReadGroup: (Int) -> Unit,
     onToggleRealBackend: (Boolean) -> Unit,
+    onExportCapture: ((String) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -59,6 +60,7 @@ fun TechScreen(
         }
         if (state.connected && state.availableGroups.isNotEmpty()) {
             item { GroupPickerCard(state.availableGroups, onReadGroup) }
+            item { ExportCaptureCard(onExportCapture) }
         }
         item { RemoteRepoCard(state, onRemoteRepo) }
         items(state.techGroups, key = { it.group }) { group ->
@@ -122,6 +124,39 @@ private fun ScenarioCard(current: FakeScenario, onScenario: (FakeScenario) -> Un
             }
         }
     }
+}
+
+@Composable
+private fun ExportCaptureCard(onExportCapture: ((String) -> Unit) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    Card {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Export debug capture", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Reads every group once and saves a JSON snapshot (identity + groups + DTCs) " +
+                    "to share for ECU-model validation.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            androidx.compose.material3.OutlinedButton(
+                onClick = {
+                    onExportCapture { path -> shareFile(context, path, "application/json") }
+                },
+            ) { Text("Export & share capture") }
+        }
+    }
+}
+
+private fun shareFile(context: android.content.Context, path: String, mime: String) {
+    val uri = androidx.core.content.FileProvider.getUriForFile(
+        context, "${context.packageName}.fileprovider", java.io.File(path),
+    )
+    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = mime
+        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(android.content.Intent.createChooser(intent, "Share capture"))
 }
 
 @OptIn(ExperimentalLayoutApi::class)
