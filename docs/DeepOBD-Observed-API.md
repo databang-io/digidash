@@ -46,7 +46,7 @@ DigiDash mirrors: paired-device picker done; probe + tag to add in ticket 13.
 ## 3. Adapter probe sequence (AdapterTypeDetect.cs, 1000 ms/step)
 
 1. **Custom adapter test**: send BMW-FAST "read ignition"
-   `82 F1 F1 FE FE 58` (checksum = 8-bit sum). Adapter echoes the request then
+   `82 F1 F1 FE FE 60` (checksum = 8-bit sum). Adapter echoes the request then
    appends a checksummed reply. If valid: configure escape mode
    (`84 F1 F1 06 <mode^55> <FF^55> <80^55> <cks>`), read firmware version
    (`82 F1 F1 FD FD <cks>` → adapterTypeId + fwVersion), read serial

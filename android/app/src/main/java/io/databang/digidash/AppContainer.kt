@@ -5,6 +5,10 @@ import android.content.SharedPreferences
 import io.databang.digidash.core.diagnostics.AndroidDongleProvider
 import io.databang.digidash.core.diagnostics.DiagnosticClient
 import io.databang.digidash.core.diagnostics.DongleProvider
+import android.bluetooth.BluetoothManager
+import io.databang.digidash.core.deepobd.AndroidSppTransport
+import io.databang.digidash.core.deepobd.DeepObdDiagnosticClient
+import io.databang.digidash.core.deepobd.SppTransport
 import io.databang.digidash.core.diagnostics.fake.FakeDiagnosticClient
 import io.databang.digidash.core.ecumodel.AssetEcuModelSource
 import io.databang.digidash.core.ecumodel.DefaultEcuModelRepository
@@ -30,8 +34,25 @@ class AppContainer(private val appContext: Context) {
 
     val fakeClient = FakeDiagnosticClient(jitter = true, operationDelayMillis = 200)
 
-    /** Fake for now; the Deep OBD adapter will slot in behind the same interface. */
-    val diagnosticClient: DiagnosticClient get() = fakeClient
+    /** Real adapter client; shares the DiagnosticClient interface with the fake. */
+    val deepObdClient = DeepObdDiagnosticClient(
+        transportFactory = { address -> buildSppTransport(address) },
+    )
+
+    /** Whether the real Deep OBD backend is selected (else fake). */
+    var useRealBackend: Boolean
+        get() = prefs.getBoolean(PREF_USE_REAL_BACKEND, false)
+        set(value) = prefs.edit().putBoolean(PREF_USE_REAL_BACKEND, value).apply()
+
+    /** Active client, chosen by [useRealBackend]. */
+    val diagnosticClient: DiagnosticClient
+        get() = if (useRealBackend) deepObdClient else fakeClient
+
+    private fun buildSppTransport(address: String): SppTransport {
+        val adapter = appContext.getSystemService(BluetoothManager::class.java)?.adapter
+            ?: error("No Bluetooth adapter")
+        return AndroidSppTransport(adapter, address)
+    }
 
     /**
      * Sources are ordered remote-first when a community git repo is configured,
@@ -56,6 +77,7 @@ class AppContainer(private val appContext: Context) {
         const val PREF_REMOTE_REPO_ENABLED = "remote_repo_enabled"
         const val PREF_DONGLE_ADDRESS = "dongle_address"
         const val PREF_DONGLE_NAME = "dongle_name"
+        const val PREF_USE_REAL_BACKEND = "use_real_backend"
 
         const val DEFAULT_REMOTE_REPO_HINT =
             "https://raw.githubusercontent.com/<user>/<repo>/main/ecu_models"

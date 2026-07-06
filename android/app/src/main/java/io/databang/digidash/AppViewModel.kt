@@ -46,6 +46,7 @@ data class AppUiState(
     val bluetoothPermissionNeeded: Boolean = false,
     val remoteRepoUrl: String = "",
     val remoteRepoEnabled: Boolean = false,
+    val useRealBackend: Boolean = false,
     val errorMessage: String? = null,
     val connecting: Boolean = false,
 ) {
@@ -73,7 +74,7 @@ data class IgnitionState(
 class AppViewModel(private val container: AppContainer) : ViewModel() {
 
     private val session = DiagnosticSessionRepository(
-        client = container.diagnosticClient,
+        clientProvider = { container.diagnosticClient },
         modelRepositoryProvider = { container.modelRepository() },
         interpreter = container.interpreter,
         scope = viewModelScope,
@@ -89,6 +90,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         AppUiState(
             remoteRepoUrl = container.prefs.getString(AppContainer.PREF_REMOTE_REPO_URL, "") ?: "",
             remoteRepoEnabled = container.prefs.getBoolean(AppContainer.PREF_REMOTE_REPO_ENABLED, false),
+            useRealBackend = container.useRealBackend,
             selectedDongle = savedDongle(),
         )
     )
@@ -146,7 +148,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             _ui.update { it.copy(connecting = true) }
             session.connect(
                 ConnectionConfig(
-                    useFakeBackend = true,
+                    useFakeBackend = !container.useRealBackend,
                     dongleAddress = state.selectedDongle?.address,
                     dongleName = state.selectedDongle?.name,
                 )
@@ -216,6 +218,11 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     fun setScenario(scenario: FakeScenario) {
         container.fakeClient.scenario = scenario
         _ui.update { it.copy(scenario = scenario) }
+    }
+
+    fun setUseRealBackend(enabled: Boolean) {
+        container.useRealBackend = enabled
+        _ui.update { it.copy(useRealBackend = enabled) }
     }
 
     fun refreshDongles() {

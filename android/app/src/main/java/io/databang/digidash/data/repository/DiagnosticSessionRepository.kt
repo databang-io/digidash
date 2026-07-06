@@ -36,7 +36,7 @@ import kotlinx.coroutines.sync.withLock
  * clear cannot interleave with the polling loop on the slow K-line.
  */
 class DiagnosticSessionRepository(
-    private val client: DiagnosticClient,
+    private val clientProvider: () -> DiagnosticClient,
     private val modelRepositoryProvider: () -> EcuModelRepository,
     private val interpreter: MeasurementInterpreter,
     private val scope: CoroutineScope,
@@ -72,14 +72,18 @@ class DiagnosticSessionRepository(
     private var stateJob: Job? = null
     private val sessionMutex = Mutex()
 
-    init {
-        stateJob = scope.launch {
-            client.connectionState().collect { _connectionState.value = it }
-        }
-    }
+    /** The client resolved for the current/last session. */
+    private var client: DiagnosticClient = clientProvider()
 
     suspend fun connect(config: ConnectionConfig): Boolean {
         _lastError.value = null
+        // Resolve the active backend (fake/real) at connect time and follow its
+        // connection state.
+        client = clientProvider()
+        stateJob?.cancel()
+        stateJob = scope.launch {
+            client.connectionState().collect { _connectionState.value = it }
+        }
         val connected = client.connect(config)
         if (connected.isFailure) {
             _lastError.value = connected.exceptionOrNull()?.asDiagnosticError()
