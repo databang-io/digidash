@@ -1,6 +1,21 @@
 # Changelog
 
-## 0.3.0 — 2026-07-06 (V1)
+## 1.0.0 — 2026-07-06 (V1 — full feature set)
+
+- **Basic Settings** for ignition timing: enter/exit (guarded confirmation,
+  auto-exit on leaving the screen), ACTIVE status, live ignition-advance
+  readout (group 011). In demo mode the ECU holds ~2250 rpm and the advance
+  sits at the 6° BTDC target so the full flow is testable without a car.
+- **Demo mode** toggle (Tech/Settings, ON by default): the whole app runs on
+  simulated ECU data — every screen usable without a dongle or vehicle.
+- **Debug capture export**: reads every group once and writes a JSON snapshot
+  (identity + groups + DTCs) to share for ECU-model validation.
+- **Android Auto**: projected trip dashboard (PaneTemplate) sharing one
+  app-scoped session with the phone UI; connect-in-demo action on the head unit.
+- App-scoped `SessionHolder`/`DigiDashApplication` so phone and car surfaces
+  stay in sync. Version 1.0.0.
+
+## 0.3.0 — 2026-07-06 (phase 2)
 
 - CSV logger (ticket 07): `CsvLogger` writes raw + interpreted sample rows and
   event rows; `LogRepository` stores logs app-private; `TripLogController`

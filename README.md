@@ -6,24 +6,34 @@
 
 | Piece | State |
 |---|---|
-| Android app `android/` (Kotlin, Compose, Material 3) | ✅ builds, 48 unit tests green |
+| Android app `android/` (Kotlin, Compose, Material 3) | ✅ builds, 49 unit tests green, lint 0 errors |
 | Gauge dashboard + Tech mode + Home/dongle picker | ✅ works in fake mode, responsive portrait/landscape |
 | Fake ECU backend (samples replay, failure scenarios incl. DTCs) | ✅ tickets 01–05 |
 | ECU Model loader: bundled assets + **public git repo** (raw HTTPS, offline cache) | ✅ |
 | ECU Model `037906024AG` (groups 000–010, thresholds, 22 DTC) | ✅ researched, needs vehicle validation (ticket 14) |
 | CSV logger, DTC screen (guarded clear), ignition assistant, on-demand raw blocks | ✅ tickets 06–09 |
+| Basic Settings (ignition advance), demo mode, debug capture export | ✅ V1 |
+| Android Auto — projected trip dashboard | ✅ V1 |
 | LBL converter `tools/lbl-converter/` (Python, 32 tests) | ✅ 558 labels → 265 models validated on a real ZIP |
 | Deep OBD adapter in Kotlin (`core/deepobd`, ticket 13) | ✅ connect + probe + protocol; ECU session pending vehicle (ticket 14) |
-| Real-vehicle validation (ticket 14), Android Auto | ⏳ backlog |
+| Real-vehicle validation (ticket 14) | ⏳ needs the car |
 
 ## Screens
 
 - **Home** — connection, ECU identity, Bluetooth dongle picker, entry to Tech mode
-- **Dash** — trip gauges (RPM, coolant, battery, IAT, injection…), N/A-safe, stale/status states
+- **Dash** — trip gauges (RPM, coolant, battery, IAT, injection, advance…), N/A-safe, stale/status states
 - **Faults** — DTCs with catalog descriptions, guarded clear
-- **Timing** — ignition assistant with the mandatory JX/T3 warning and 2E Grundeinstellung checklist
+- **Timing** — ignition assistant: mandatory JX/T3 warning, 2E Grundeinstellung checklist, **Basic Settings** enter/exit with live ignition-advance readout
 - **Logs** — record CSV (raw + interpreted), share, delete
-- **Tech** — raw measuring blocks, on-demand group reads, fake/real backend toggle, remote ECU-model repo
+- **Tech / Settings** — **Demo mode** toggle (on by default, no car needed), raw measuring blocks, on-demand group reads, debug capture export, remote ECU-model repo
+- **Android Auto** — trip values projected on the head unit (developer mode required for personal apps)
+
+## Demo mode
+
+Demo mode is **ON by default** — the app runs on simulated ECU data so you can
+try every screen (dashboard, faults, ignition Basic Settings, logging, capture
+export, Android Auto) without a dongle or vehicle. Turn it off in the Tech tab
+to use the real Bluetooth adapter.
 
 ## Quick start
 
