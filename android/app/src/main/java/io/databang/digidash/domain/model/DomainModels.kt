@@ -51,6 +51,19 @@ data class RawDtc(
     val description: String? = null,
 )
 
+enum class DtcSeverity { INFO, WARNING, CRITICAL }
+
+/** A DTC after ECU-model catalog lookup. */
+data class InterpretedDtc(
+    val code: String,
+    val title: String?,
+    val statusRaw: String?,
+    val severity: DtcSeverity,
+    val raw: RawDtc,
+) {
+    val hasDescription: Boolean get() = !title.isNullOrBlank()
+}
+
 enum class MeasurementStatus { NORMAL, WARNING, CRITICAL, UNKNOWN, UNAVAILABLE }
 
 /** A raw field after interpretation through the ECU Model. */

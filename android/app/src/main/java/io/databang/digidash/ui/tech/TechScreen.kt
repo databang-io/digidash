@@ -2,6 +2,8 @@ package io.databang.digidash.ui.tech
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -41,6 +44,7 @@ fun TechScreen(
     state: AppUiState,
     onScenario: (FakeScenario) -> Unit,
     onRemoteRepo: (url: String, enabled: Boolean) -> Unit,
+    onReadGroup: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -49,6 +53,9 @@ fun TechScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item { ScenarioCard(state.scenario, onScenario) }
+        if (state.connected && state.availableGroups.isNotEmpty()) {
+            item { GroupPickerCard(state.availableGroups, onReadGroup) }
+        }
         item { RemoteRepoCard(state, onRemoteRepo) }
         items(state.techGroups, key = { it.group }) { group ->
             RawGroupCard(group)
@@ -75,6 +82,31 @@ private fun ScenarioCard(current: FakeScenario, onScenario: (FakeScenario) -> Un
                         selected = scenario == current,
                         onClick = { onScenario(scenario) },
                         label = { Text(scenario.name.lowercase().replace('_', ' ')) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GroupPickerCard(groups: List<Int>, onReadGroup: (Int) -> Unit) {
+    Card {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Read measuring block on demand", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Tap a group to poll it once. Group 000 is the primary raw display on this ECU.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                groups.forEach { g ->
+                    AssistChip(
+                        onClick = { onReadGroup(g) },
+                        label = { Text(EcuModel.groupKey(g)) },
                     )
                 }
             }

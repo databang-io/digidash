@@ -8,9 +8,13 @@ import io.databang.digidash.core.diagnostics.ConnectionState
 import io.databang.digidash.core.diagnostics.DongleDevice
 import io.databang.digidash.core.diagnostics.fake.FakeScenario
 import io.databang.digidash.core.ecumodel.EcuModel
+import io.databang.digidash.core.logging.LogFile
+import io.databang.digidash.core.logging.TripLogController
 import io.databang.digidash.data.repository.DiagnosticSessionRepository
 import io.databang.digidash.domain.model.DashboardCardState
+import io.databang.digidash.domain.model.DtcSeverity
 import io.databang.digidash.domain.model.EcuIdentity
+import io.databang.digidash.domain.model.InterpretedDtc
 import io.databang.digidash.domain.model.InterpretedMeasurement
 import io.databang.digidash.domain.model.MeasurementStatus
 import kotlinx.coroutines.delay
@@ -29,6 +33,13 @@ data class AppUiState(
     /** Latest measurements grouped by measuring block for the Tech screen. */
     val techGroups: List<TechGroup> = emptyList(),
     val dtcCount: Int? = null,
+    val dtcs: List<InterpretedDtc> = emptyList(),
+    val dtcBusy: Boolean = false,
+    val ignition: IgnitionState = IgnitionState(),
+    val recording: Boolean = false,
+    val currentLogFile: String? = null,
+    val logs: List<LogFile> = emptyList(),
+    val availableGroups: List<Int> = emptyList(),
     val scenario: FakeScenario = FakeScenario.NORMAL,
     val dongles: List<DongleDevice> = emptyList(),
     val selectedDongle: DongleDevice? = null,
@@ -37,12 +48,26 @@ data class AppUiState(
     val remoteRepoEnabled: Boolean = false,
     val errorMessage: String? = null,
     val connecting: Boolean = false,
-)
+) {
+    val connected: Boolean get() = connection == ConnectionState.CONNECTED
+}
 
 data class TechGroup(
     val group: Int,
     val label: String,
     val measurements: List<InterpretedMeasurement>,
+)
+
+/** Automatic checklist items for the ignition assistant, derived from ECU data. */
+data class IgnitionState(
+    val coolantOk: Boolean = false,
+    val idleStable: Boolean = false,
+    val batteryOk: Boolean = false,
+    val noHallFault: Boolean = false,
+    val noCoolantFault: Boolean = false,
+    val noThrottleFault: Boolean = false,
+    val basicSettingsSupported: Boolean = false,
+    val basicSettingsActive: Boolean = false,
 )
 
 class AppViewModel(private val container: AppContainer) : ViewModel() {
@@ -51,6 +76,12 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         client = container.diagnosticClient,
         modelRepositoryProvider = { container.modelRepository() },
         interpreter = container.interpreter,
+        scope = viewModelScope,
+    )
+
+    private val tripLog = TripLogController(
+        session = session,
+        logRepository = container.logRepository,
         scope = viewModelScope,
     )
 
@@ -65,23 +96,35 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
 
     init {
         viewModelScope.launch {
-            session.connectionState.collect { state ->
-                _ui.update { it.copy(connection = state) }
-            }
+            session.connectionState.collect { state -> _ui.update { it.copy(connection = state) } }
         }
         viewModelScope.launch {
             session.identity.collect { id -> _ui.update { it.copy(identity = id) } }
         }
         viewModelScope.launch {
-            session.model.collect { m -> _ui.update { it.copy(model = m) } }
+            session.model.collect { m ->
+                _ui.update {
+                    it.copy(model = m, availableGroups = m?.groups?.keys
+                        ?.mapNotNull { k -> k.toIntOrNull() }?.sorted().orEmpty())
+                }
+            }
         }
         viewModelScope.launch {
             session.dtcCount.collect { c -> _ui.update { it.copy(dtcCount = c) } }
         }
         viewModelScope.launch {
+            session.dtcs.collect { list -> _ui.update { it.copy(dtcs = list) } }
+        }
+        viewModelScope.launch {
             session.lastError.collect { e ->
                 _ui.update { it.copy(errorMessage = e?.userMessage()) }
             }
+        }
+        viewModelScope.launch {
+            tripLog.recording.collect { r -> _ui.update { it.copy(recording = r) } }
+        }
+        viewModelScope.launch {
+            tripLog.currentFile.collect { f -> _ui.update { it.copy(currentLogFile = f) } }
         }
         // Rebuild cards on new measurements and once per second for staleness.
         viewModelScope.launch {
@@ -94,6 +137,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             }
         }
         refreshDongles()
+        refreshLogs()
     }
 
     fun connect() {
@@ -112,8 +156,62 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun disconnect() {
-        viewModelScope.launch { session.disconnect() }
+        viewModelScope.launch {
+            tripLog.stop()
+            session.disconnect()
+        }
     }
+
+    // --- DTC ---
+
+    fun refreshDtcs() {
+        viewModelScope.launch {
+            _ui.update { it.copy(dtcBusy = true) }
+            session.refreshDtcs()
+            _ui.update { it.copy(dtcBusy = false) }
+        }
+    }
+
+    /** Caller (UI) must have shown the confirmation dialog first. */
+    fun clearDtcsConfirmed() {
+        viewModelScope.launch {
+            _ui.update { it.copy(dtcBusy = true) }
+            session.clearDtcs()
+            _ui.update { it.copy(dtcBusy = false) }
+        }
+    }
+
+    // --- Logging ---
+
+    fun toggleRecording() {
+        if (tripLog.recording.value) {
+            tripLog.stop()
+            refreshLogs()
+        } else {
+            tripLog.start()
+        }
+    }
+
+    fun addLogNote(note: String) = tripLog.addNote(note)
+
+    fun refreshLogs() {
+        _ui.update { it.copy(logs = container.logRepository.list()) }
+    }
+
+    fun deleteLog(log: LogFile) {
+        container.logRepository.delete(log)
+        refreshLogs()
+    }
+
+    fun logFilePath(log: LogFile): String = log.path
+
+    // --- Raw blocks on demand ---
+
+    fun readGroup(group: Int) {
+        viewModelScope.launch { session.readGroupOnce(group) }
+    }
+
+    // --- Settings / dongle ---
 
     fun setScenario(scenario: FakeScenario) {
         container.fakeClient.scenario = scenario
@@ -147,6 +245,8 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             .apply()
         _ui.update { it.copy(remoteRepoUrl = url.trim(), remoteRepoEnabled = enabled) }
     }
+
+    fun dismissError() = _ui.update { it.copy(errorMessage = null) }
 
     private fun savedDongle(): DongleDevice? {
         val address = container.prefs.getString(AppContainer.PREF_DONGLE_ADDRESS, null)
@@ -207,7 +307,33 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                 )
             }
 
-        _ui.update { it.copy(cards = cards, techGroups = techGroups) }
+        _ui.update {
+            it.copy(cards = cards, techGroups = techGroups, ignition = deriveIgnition(measurements, state.dtcs))
+        }
+    }
+
+    private fun deriveIgnition(
+        measurements: Map<String, InterpretedMeasurement>,
+        dtcs: List<InterpretedDtc>,
+    ): IgnitionState {
+        fun value(vararg keys: String): Double? =
+            keys.firstNotNullOfOrNull { measurements[it]?.value }
+
+        val coolant = value("coolant_temp", "coolant_temp_000")
+        val rpm = value("rpm", "rpm_000")
+        val battery = value("battery_voltage")
+        fun hasDtc(code: String) = dtcs.any { it.code == code }
+
+        return IgnitionState(
+            coolantOk = coolant != null && coolant >= 80.0,
+            idleStable = rpm != null && rpm in 700.0..1000.0,
+            batteryOk = battery != null && battery >= 12.5,
+            noHallFault = !hasDtc("00515") && !hasDtc("00513"),
+            noCoolantFault = !hasDtc("00522"),
+            noThrottleFault = !hasDtc("00518") && !hasDtc("00516") && !hasDtc("00517"),
+            basicSettingsSupported = false, // fake backend returns UnsupportedFunction
+            basicSettingsActive = false,
+        )
     }
 
     companion object {

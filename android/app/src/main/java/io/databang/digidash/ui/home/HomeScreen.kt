@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Refresh
@@ -46,6 +47,7 @@ fun HomeScreen(
     onDisconnect: () -> Unit,
     onRefreshDongles: () -> Unit,
     onSelectDongle: (DongleDevice) -> Unit,
+    onOpenTech: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -73,6 +75,11 @@ fun HomeScreen(
             onRefresh = onRefreshDongles,
             onSelect = onSelectDongle,
         )
+        OutlinedButton(onClick = onOpenTech, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.Build, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("Tech mode — raw blocks & advanced tools")
+        }
     }
 }
 

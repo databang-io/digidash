@@ -13,6 +13,7 @@ import io.databang.digidash.core.ecumodel.EcuModelSource
 import io.databang.digidash.core.ecumodel.RemoteEcuModelSource
 import io.databang.digidash.core.interpret.DefaultMeasurementInterpreter
 import io.databang.digidash.core.interpret.MeasurementInterpreter
+import io.databang.digidash.core.logging.LogRepository
 import java.io.File
 
 /** Hand-rolled dependency container; small enough that Hilt would be overkill. */
@@ -22,6 +23,8 @@ class AppContainer(private val appContext: Context) {
         appContext.getSharedPreferences("digidash", Context.MODE_PRIVATE)
 
     val dongleProvider: DongleProvider = AndroidDongleProvider(appContext)
+
+    val logRepository = LogRepository(appContext)
 
     val interpreter: MeasurementInterpreter = DefaultMeasurementInterpreter()
 

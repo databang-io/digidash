@@ -8,9 +8,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -31,9 +34,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import io.databang.digidash.core.diagnostics.ConnectionState
 import io.databang.digidash.ui.dashboard.DashboardScreen
+import io.databang.digidash.ui.dtc.DtcScreen
 import io.databang.digidash.ui.home.HomeScreen
+import io.databang.digidash.ui.ignition.IgnitionScreen
+import io.databang.digidash.ui.logs.LogsScreen
 import io.databang.digidash.ui.tech.TechScreen
 import io.databang.digidash.ui.theme.DigiDashTheme
 
@@ -58,7 +63,10 @@ private enum class Destination(
     val icon: ImageVector,
 ) {
     HOME("home", "Home", Icons.Default.Home),
-    DASHBOARD("dashboard", "Dashboard", Icons.Default.Speed),
+    DASHBOARD("dashboard", "Dash", Icons.Default.Speed),
+    DTC("dtc", "Faults", Icons.Default.Warning),
+    IGNITION("ignition", "Timing", Icons.Default.Tune),
+    LOGS("logs", "Logs", Icons.AutoMirrored.Filled.List),
     TECH("tech", "Tech", Icons.Default.Build),
 }
 
@@ -95,12 +103,28 @@ fun DigiDashApp(container: AppContainer) {
                     onDisconnect = viewModel::disconnect,
                     onRefreshDongles = viewModel::refreshDongles,
                     onSelectDongle = viewModel::selectDongle,
+                    onOpenTech = { navigate(Destination.TECH) },
                 )
             }
             composable(Destination.DASHBOARD.route) {
-                DashboardScreen(
-                    cards = state.cards,
-                    connected = state.connection == ConnectionState.CONNECTED,
+                DashboardScreen(cards = state.cards, connected = state.connected)
+            }
+            composable(Destination.DTC.route) {
+                DtcScreen(
+                    state = state,
+                    onRefresh = viewModel::refreshDtcs,
+                    onClearConfirmed = viewModel::clearDtcsConfirmed,
+                )
+            }
+            composable(Destination.IGNITION.route) {
+                IgnitionScreen(state = state, onNote = viewModel::addLogNote)
+            }
+            composable(Destination.LOGS.route) {
+                LogsScreen(
+                    state = state,
+                    onToggleRecording = viewModel::toggleRecording,
+                    onRefresh = viewModel::refreshLogs,
+                    onDelete = viewModel::deleteLog,
                 )
             }
             composable(Destination.TECH.route) {
@@ -108,6 +132,7 @@ fun DigiDashApp(container: AppContainer) {
                     state = state,
                     onScenario = viewModel::setScenario,
                     onRemoteRepo = viewModel::setRemoteRepo,
+                    onReadGroup = viewModel::readGroup,
                 )
             }
         }
@@ -131,7 +156,8 @@ fun DigiDashApp(container: AppContainer) {
         Scaffold(
             bottomBar = {
                 NavigationBar {
-                    Destination.entries.forEach { dest ->
+                    // Tech lives on the Home screen to keep the bar to 5 primary tabs.
+                    Destination.entries.filter { it != Destination.TECH }.forEach { dest ->
                         NavigationBarItem(
                             selected = currentRoute == dest.route,
                             onClick = { navigate(dest) },

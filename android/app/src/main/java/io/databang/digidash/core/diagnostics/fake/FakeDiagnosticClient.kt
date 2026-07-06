@@ -30,7 +30,7 @@ data class FakeSampleBlock(
 )
 
 /** Fake behaviours used by tests and the developer settings screen. */
-enum class FakeScenario { NORMAL, DONGLE_NOT_FOUND, ECU_NO_RESPONSE, TIMEOUT }
+enum class FakeScenario { NORMAL, WITH_DTCS, DONGLE_NOT_FOUND, ECU_NO_RESPONSE, TIMEOUT }
 
 /**
  * Replays sample data captured from the target vehicle so the whole UI can be
@@ -102,15 +102,27 @@ class FakeDiagnosticClient(
         )
     }
 
+    private var dtcsCleared = false
+
     override suspend fun readDtc(): Result<List<RawDtc>> {
         val failure = guard<List<RawDtc>>("readDtc")
         if (failure != null) return failure
+        if (scenario == FakeScenario.WITH_DTCS && !dtcsCleared) {
+            return Result.success(
+                listOf(
+                    RawDtc(code = "00515", statusRaw = "27-10", description = null),
+                    RawDtc(code = "00522", statusRaw = "35-00", description = null),
+                    RawDtc(code = "01247", statusRaw = "00-00", description = null),
+                )
+            )
+        }
         return Result.success(emptyList())
     }
 
     override suspend fun clearDtc(): Result<Unit> {
         val failure = guard<Unit>("clearDtc")
         if (failure != null) return failure
+        dtcsCleared = true
         return Result.success(Unit)
     }
 
