@@ -33,6 +33,17 @@ def normalize_part_number(value):
     return re.sub(r"[-\s_]+", "", value or "").upper()
 
 
+def is_wildcard_filename(filename):
+    """True for wildcard label filenames like ``02E-300-0xx.lbl``.
+
+    Ross-Tech uses runs of ``x``/``?`` as placeholders in hub files that
+    cover several part numbers; such files must not yield a model of
+    their own.
+    """
+    stem = os.path.splitext(os.path.basename(filename))[0]
+    return bool(re.search(r"xx|\?", stem, re.IGNORECASE))
+
+
 def slugify(name):
     """ASCII lowercase underscore slug of a field name; '' if nothing left."""
     text = unicodedata.normalize("NFKD", name)
@@ -43,14 +54,22 @@ def slugify(name):
 
 def build_model(part_number, parsed, confidence, source_notes,
                 inferred_from=None):
-    """Build an ECU Model dict from a resolved ParsedLbl."""
+    """Build an ECU Model dict from a resolved ParsedLbl.
+
+    Returns ``(model, skipped_fields)`` where ``skipped_fields`` counts
+    parsed fields with index > 8 that the schema cannot represent.
+    """
     groups = {}
+    skipped_fields = 0
     for group_num in sorted(parsed.groups):
         pgroup = parsed.groups[group_num]
         gkey = "%03d" % group_num
         fields = []
         key_counts = {}
         for idx in sorted(pgroup.fields):
+            if idx > 8:
+                skipped_fields += 1
+                continue
             name, unit, extra = pgroup.fields[idx]
             base_key = slugify(name) or "raw_%s_%d" % (gkey, idx)
             count = key_counts.get(base_key, 0) + 1
@@ -87,7 +106,7 @@ def build_model(part_number, parsed, confidence, source_notes,
     }
     if inferred_from:
         model["compatibility"] = {"inferred_from": inferred_from}
-    return model
+    return model, skipped_fields
 
 
 def derive_inferred_model(base_model, target_part_number, base_file):

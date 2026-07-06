@@ -1,13 +1,20 @@
 """Tolerant parser for Ross-Tech VCDS ``.LBL`` label files.
 
-Only measuring-block lines are extracted:
+Only measuring-block lines are extracted. Two line formats are
+accepted:
 
-    GGG.F,text[,unit][,extra...]
+    G,F,name[,unit-or-name-part][,spec/notes...]   (real VCDS format)
+    GGG.F,name[,unit][,extra...]                   (legacy format)
 
-where ``GGG`` is a 1-3 digit group number and ``F`` a field index.
-``F == 0`` means the line carries the group label. Everything else
-(``A*``, ``C*``, ``L*`` prefixed lines, free text, ...) is ignored
-silently but counted so the report can mention it.
+``G`` is the group number (0-255, zero-padded or not) and ``F`` the
+field index (0-25). ``F == 0`` means the line carries the group label.
+The token after the name is treated as a unit only when it matches the
+unit heuristic; when it looks like a name fragment (letters/spaces, no
+digits) it is joined to the name with a space — VCDS labels often split
+a two-part name across two comma tokens (``Coolant,Temperature``).
+Remaining tokens are kept as free-text notes. Everything else (``A*``,
+``C*``, ``L*`` prefixed lines, free text, ...) is ignored silently but
+counted so the report can mention it.
 """
 
 import os
@@ -18,8 +25,17 @@ from . import report
 # Encoding fallback order per SPEC: UTF-8 (BOM aware) -> cp1252 -> latin-1.
 _ENCODINGS = ("utf-8-sig", "cp1252")
 
-GROUP_LINE_RE = re.compile(r"^\s*(\d{1,3})\.(\d{1,2})\s*,(.*)$")
+# Real VCDS format: G,F,rest (group may be zero-padded: 0,3 / 016,1)
+GROUP_LINE_RE = re.compile(r"^\s*(\d{1,3})\s*,\s*(\d{1,2})\s*,(.*)$")
+# Legacy format: GGG.F,rest
+LEGACY_GROUP_LINE_RE = re.compile(r"^\s*(\d{1,3})\.(\d{1,2})\s*,(.*)$")
 REDIRECT_RE = re.compile(r"^\s*REDIRECT\s*,\s*([^,;]+?)\s*(?:[,;].*)?$", re.IGNORECASE)
+
+MAX_GROUP = 255
+MAX_FIELD = 25
+
+# Name fragments: letters/spaces (plus light punctuation), no digits.
+_NAME_FRAGMENT_RE = re.compile(r"^[A-Za-z][A-Za-z .()'/&+-]*$")
 
 # Heuristic unit detection for the token following the field name.
 _UNIT_EXACT_RE = re.compile(
@@ -106,7 +122,7 @@ def parse_lbl(text, path, warnings):
             parsed.redirects.append(m.group(1).strip())
             continue
 
-        m = GROUP_LINE_RE.match(line)
+        m = GROUP_LINE_RE.match(line) or LEGACY_GROUP_LINE_RE.match(line)
         if not m:
             # Non measuring-block line (A*, C*, L* prefixes, free text...).
             parsed.stats["ignored"] += 1
@@ -115,6 +131,10 @@ def parse_lbl(text, path, warnings):
         group_num = int(m.group(1))
         field_idx = int(m.group(2))
         rest = m.group(3)
+
+        if group_num > MAX_GROUP or field_idx > MAX_FIELD:
+            parsed.stats["ignored"] += 1
+            continue
 
         group = parsed.groups.setdefault(group_num, ParsedGroup())
 
@@ -130,21 +150,22 @@ def parse_lbl(text, path, warnings):
             parsed.stats["group_labels"] += 1
             continue
 
-        if field_idx > 8:
-            warnings.append(report.make_warning(
-                path, lineno, "FIELD_INDEX_OUT_OF_RANGE",
-                "Field index %d out of range 1-8 in group %03d; line skipped"
-                % (field_idx, group_num)))
-            continue
-
         tokens = rest.split(",")
         name = tokens[0].strip()
         unit = ""
         extra_tokens = tokens[1:]
-        if extra_tokens and looks_like_unit(extra_tokens[0]):
-            unit = extra_tokens[0].strip()
-            extra_tokens = extra_tokens[1:]
-        extra = ",".join(t.strip() for t in extra_tokens).strip(", ")
+        if extra_tokens:
+            token2 = extra_tokens[0].strip()
+            if looks_like_unit(token2):
+                unit = token2
+                extra_tokens = extra_tokens[1:]
+            elif token2 and not any(ch.isdigit() for ch in token2) \
+                    and _NAME_FRAGMENT_RE.match(token2):
+                # Two-part name split across comma tokens.
+                name = ("%s %s" % (name, token2)).strip()
+                extra_tokens = extra_tokens[1:]
+        extra = ", ".join(
+            t for t in (tok.strip() for tok in extra_tokens) if t)
 
         if field_idx in group.fields:
             warnings.append(report.make_warning(

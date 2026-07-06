@@ -70,15 +70,19 @@ def convert(input_zip, output_dir, target=None):
     resolved, chains = parser_mod.resolve_redirects(parsed_files, warnings)
 
     # Build one model per file whose name is a valid VAG part number.
-    models = {}         # part number -> model dict
-    model_files = {}    # part number -> originating file path in the zip
+    # Wildcard hubs (e.g. 02E-300-0xx.lbl) and addressing helpers (e.g.
+    # 00-01.lbl) are parsed (they may be redirect hubs) but never yield
+    # a model; they are reported once, aggregated, at info level.
+    models = {}          # part number -> model dict
+    model_files = {}     # part number -> originating file path in the zip
+    non_model_files = []  # wildcard/helper files skipped for model gen
+    skipped_field_total = 0
+    skipped_field_files = 0
     for parsed in parsed_files:
         part_number = model_mod.part_number_from_filename(parsed.path)
-        if part_number is None:
-            warnings.append(report_mod.make_warning(
-                parsed.path, None, "INVALID_PART_NUMBER",
-                "Filename does not normalize to a VAG part number; "
-                "no model generated"))
+        if part_number is None or \
+                model_mod.is_wildcard_filename(parsed.path):
+            non_model_files.append(parsed.basename)
             continue
         effective = resolved.get(parsed.path)
         if effective is None or not effective.has_content:
@@ -97,8 +101,11 @@ def convert(input_zip, output_dir, target=None):
 
         chain = chains.get(parsed.path, [parsed])
         notes = _chain_notes(chain)
-        ecu_model = model_mod.build_model(
+        ecu_model, skipped_fields = model_mod.build_model(
             part_number, effective, "medium", notes)
+        if skipped_fields:
+            skipped_field_total += skipped_fields
+            skipped_field_files += 1
 
         errors = model_mod.validate_model(ecu_model)
         if errors:
@@ -108,6 +115,22 @@ def convert(input_zip, output_dir, target=None):
             continue
         models[part_number] = ecu_model
         model_files[part_number] = parsed.path
+
+    if non_model_files:
+        warnings.append(report_mod.make_warning(
+            None, None, "NON_MODEL_FILE",
+            "%d wildcard/helper label file(s) parsed without model "
+            "generation (e.g. %s)"
+            % (len(non_model_files),
+               ", ".join(sorted(non_model_files)[:5])),
+            level="info"))
+    if skipped_field_total:
+        warnings.append(report_mod.make_warning(
+            None, None, "FIELD_INDEX_OUT_OF_RANGE",
+            "%d field(s) with index > 8 across %d file(s) excluded from "
+            "models (schema supports indexes 1-8)"
+            % (skipped_field_total, skipped_field_files),
+            level="info"))
 
     # Target handling: exact match, else base-file fallback.
     target_norm = None

@@ -5,12 +5,13 @@ import json
 import os
 
 
-def make_warning(file, line, code, message):
+def make_warning(file, line, code, message, level="warning"):
     return {
         "file": file,
         "line": line,
         "code": code,
         "message": message,
+        "level": level,
     }
 
 
@@ -75,7 +76,10 @@ def write_report_md(output_dir, summary, warnings):
             loc = w["file"] or "-"
             if w.get("line"):
                 loc += ":%d" % w["line"]
-            lines.append("- **%s** `%s` %s" % (w["code"], loc, w["message"]))
+            level = w.get("level", "warning")
+            tag = " _(info)_" if level == "info" else ""
+            lines.append("- **%s**%s `%s` %s"
+                         % (w["code"], tag, loc, w["message"]))
     else:
         lines.append("- none")
     lines.append("")
