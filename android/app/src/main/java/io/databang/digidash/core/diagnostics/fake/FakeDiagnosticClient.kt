@@ -92,6 +92,23 @@ class FakeDiagnosticClient(
     override suspend fun readMeasuringBlock(group: Int): Result<RawMeasuringBlock> {
         val failure = guard<RawMeasuringBlock>("readMeasuringBlock $group")
         if (failure != null) return failure
+        // Group 011 carries the ignition-advance readout. In Basic Settings the
+        // engine holds ~2250 rpm and the advance sits near the 6° BTDC target
+        // (simulating a correctly-adjusted distributor); otherwise idle ~12°.
+        if (group == 11) {
+            val rpm = if (basicSettingsActive) "2250" else "900"
+            val advance = if (basicSettingsActive) "6" else "12"
+            return Result.success(
+                RawMeasuringBlock(
+                    group = 11,
+                    fields = listOf(
+                        RawField(1, applyJitter(rpm)),
+                        RawField(2, applyJitter(advance)),
+                    ),
+                    timestampMillis = clock(),
+                )
+            )
+        }
         val block = sample.blocks.find { it.group == group }
             ?: return diagnosticFailure(DiagnosticError.UnsupportedFunction)
         val fields = block.fields.mapIndexed { i, raw ->
@@ -126,11 +143,21 @@ class FakeDiagnosticClient(
         return Result.success(Unit)
     }
 
-    override suspend fun enterBasicSettings(group: Int?): Result<Unit> =
-        diagnosticFailure(DiagnosticError.UnsupportedFunction)
+    var basicSettingsActive: Boolean = false
+        private set
 
-    override suspend fun exitBasicSettings(): Result<Unit> =
-        diagnosticFailure(DiagnosticError.UnsupportedFunction)
+    override suspend fun enterBasicSettings(group: Int?): Result<Unit> {
+        val failure = guard<Unit>("enterBasicSettings")
+        if (failure != null) return failure
+        basicSettingsActive = true
+        return Result.success(Unit)
+    }
+
+    override suspend fun exitBasicSettings(): Result<Unit> {
+        // Always allow leaving basic settings (safety: never get stuck in it).
+        basicSettingsActive = false
+        return Result.success(Unit)
+    }
 
     override fun connectionState(): Flow<ConnectionState> = state
 

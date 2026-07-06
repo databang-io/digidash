@@ -77,24 +77,28 @@ fun TechScreen(
 
 @Composable
 private fun BackendCard(state: AppUiState, onToggle: (Boolean) -> Unit) {
+    // Demo mode ON == fake backend (no car needed). Turning it OFF uses the
+    // real Bluetooth dongle.
+    val demoMode = !state.useRealBackend
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Real dongle (Deep OBD adapter)",
+                    "Demo mode (no car needed)",
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f),
                 )
-                Switch(checked = state.useRealBackend, onCheckedChange = onToggle)
+                Switch(checked = demoMode, onCheckedChange = { onToggle(!it) })
             }
             Text(
-                if (state.useRealBackend)
-                    "Connecting will use the selected Bluetooth dongle. KWP1281 needs an " +
-                        "ELM327 with the Deep OBD replacement firmware. The ECU session is " +
-                        "still being validated on the vehicle — connect + adapter probe work; " +
-                        "live measuring blocks arrive after the first real-vehicle session."
+                if (demoMode)
+                    "Demo mode is ON: the app runs on simulated ECU data so you can try every " +
+                        "screen — dashboard, faults, ignition Basic Settings, logging — without a " +
+                        "dongle or vehicle. Turn it off to use the real Bluetooth adapter."
                 else
-                    "Using the fake backend: full UI works with no dongle or vehicle.",
+                    "Demo mode is OFF — connecting uses the selected Bluetooth dongle. KWP1281 " +
+                        "needs an ELM327 with the Deep OBD replacement firmware. Connect + adapter " +
+                        "probe work now; live ECU blocks arrive after the first vehicle session.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

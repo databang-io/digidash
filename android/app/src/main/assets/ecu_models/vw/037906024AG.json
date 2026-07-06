@@ -655,6 +655,39 @@
           "confidence": "low"
         }
       ]
+    },
+    "011": {
+      "label": "Ignition timing (Basic Settings candidate) - validate on vehicle",
+      "polling_priority": "garage",
+      "fields": [
+        {
+          "index": 1,
+          "key": "rpm_g11",
+          "name": "Engine speed",
+          "unit": "rpm",
+          "value_type": "number",
+          "formula": {
+            "type": "raw"
+          },
+          "confidence": "low"
+        },
+        {
+          "index": 2,
+          "key": "ignition_advance",
+          "name": "Ignition advance (ECU-reported)",
+          "unit": "°BTDC",
+          "value_type": "number",
+          "formula": {
+            "type": "raw"
+          },
+          "confidence": "low",
+          "display": {
+            "trip_card": true,
+            "order": 80
+          },
+          "notes": "Spec 6 (4-8) deg BTDC at ~2250 rpm in Basic Settings. ECU-reported only; timing is set mechanically by rotating the distributor. Validate on vehicle."
+        }
+      ]
     }
   },
   "dtc_catalog": {

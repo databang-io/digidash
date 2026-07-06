@@ -117,7 +117,12 @@ fun DigiDashApp(container: AppContainer) {
                 )
             }
             composable(Destination.IGNITION.route) {
-                IgnitionScreen(state = state, onNote = viewModel::addLogNote)
+                IgnitionScreen(
+                    state = state,
+                    onNote = viewModel::addLogNote,
+                    onEnterBasicSettings = viewModel::enterBasicSettingsConfirmed,
+                    onExitBasicSettings = viewModel::exitBasicSettings,
+                )
             }
             composable(Destination.LOGS.route) {
                 LogsScreen(

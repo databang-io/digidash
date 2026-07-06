@@ -15,16 +15,22 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -56,10 +62,17 @@ private val guidance = listOf(
 fun IgnitionScreen(
     state: AppUiState,
     onNote: (String) -> Unit,
+    onEnterBasicSettings: () -> Unit,
+    onExitBasicSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val ign = state.ignition
     val manualChecks = remember { mutableStateMapOf<String, Boolean>() }
+
+    // Safety: always leave Basic Settings when the screen is disposed.
+    DisposableEffect(Unit) {
+        onDispose { if (ign.basicSettingsActive) onExitBasicSettings() }
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -70,7 +83,14 @@ fun IgnitionScreen(
         item { ValuesCard(state) }
         item { ChecklistCard(ign, manualChecks) }
         item { GuidanceCard() }
-        item { BasicSettingsCard(ign) }
+        item {
+            BasicSettingsCard(
+                ign = ign,
+                connected = state.connected,
+                onEnter = onEnterBasicSettings,
+                onExit = onExitBasicSettings,
+            )
+        }
     }
 }
 
@@ -197,22 +217,78 @@ private fun GuidanceCard() {
 }
 
 @Composable
-private fun BasicSettingsCard(ign: IgnitionState) {
+private fun BasicSettingsCard(
+    ign: IgnitionState,
+    connected: Boolean,
+    onEnter: () -> Unit,
+    onExit: () -> Unit,
+) {
+    var showConfirm by remember { mutableStateOf(false) }
     Card {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Basic Settings", style = MaterialTheme.typography.titleMedium)
-            if (ign.basicSettingsSupported) {
+            if (!ign.basicSettingsSupported) {
                 Text(
-                    if (ign.basicSettingsActive) "Active" else "Inactive",
-                    color = if (ign.basicSettingsActive) StatusColors.normal else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                Text(
-                    "Basic Settings unsupported by current backend.",
+                    "Basic Settings unsupported by current backend " +
+                        "(available in demo mode; real adapter pending vehicle validation).",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                return@Column
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Status:", style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    if (ign.basicSettingsActive) "ACTIVE" else "Inactive",
+                    color = if (ign.basicSettingsActive) StatusColors.normal
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.titleSmall,
+                )
+            }
+            Text(
+                "In Basic Settings the ECU holds a fixed condition (~2250 rpm) so you can " +
+                    "read the ignition advance while rotating the distributor. Leaving this " +
+                    "screen exits Basic Settings automatically.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (ign.basicSettingsActive) {
+                Button(onClick = onExit, modifier = Modifier.fillMaxWidth()) {
+                    Text("Exit Basic Settings")
+                }
+            } else {
+                Button(
+                    onClick = { showConfirm = true },
+                    enabled = connected,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Enter Basic Settings") }
             }
         }
+    }
+
+    if (showConfirm) {
+        AlertDialog(
+            onDismissRequest = { showConfirm = false },
+            icon = { Icon(Icons.Default.Warning, contentDescription = null) },
+            title = { Text("Enter Basic Settings?") },
+            text = {
+                Text(
+                    "This puts the ECU into its adjustment condition. Make sure the engine is " +
+                        "warm, the handbrake is on and the vehicle is in neutral. Timing is still " +
+                        "adjusted mechanically by rotating the distributor — the app only shows " +
+                        "the ECU-reported advance."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showConfirm = false
+                    onEnter()
+                }) { Text("Enter") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirm = false }) { Text("Cancel") }
+            },
+        )
     }
 }

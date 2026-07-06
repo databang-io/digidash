@@ -58,6 +58,12 @@ class DiagnosticSessionRepository(
     private val _dtcCount = MutableStateFlow<Int?>(null)
     val dtcCount: StateFlow<Int?> = _dtcCount.asStateFlow()
 
+    private val _basicSettingsActive = MutableStateFlow(false)
+    val basicSettingsActive: StateFlow<Boolean> = _basicSettingsActive.asStateFlow()
+
+    /** Group polled while in Basic Settings (ignition advance readout). */
+    private val basicSettingsGroup = 11
+
     private val _lastError = MutableStateFlow<DiagnosticError?>(null)
     val lastError: StateFlow<DiagnosticError?> = _lastError.asStateFlow()
 
@@ -159,6 +165,25 @@ class DiagnosticSessionRepository(
 
     fun logUserNote(note: String) = emit(SessionEvent.UserNote(note))
 
+    /** Enter Basic Settings. Callers must confirm with the user first (safety). */
+    suspend fun enterBasicSettings(group: Int? = 0): Result<Unit> = sessionMutex.withLock {
+        client.enterBasicSettings(group)
+            .onSuccess {
+                _basicSettingsActive.value = true
+                emit(SessionEvent.BasicSettingsEntered)
+            }
+            .onFailure { _lastError.value = it.asDiagnosticError() }
+    }
+
+    suspend fun exitBasicSettings(): Result<Unit> = sessionMutex.withLock {
+        client.exitBasicSettings()
+            .onSuccess {
+                _basicSettingsActive.value = false
+                emit(SessionEvent.BasicSettingsExited)
+            }
+            .onFailure { _lastError.value = it.asDiagnosticError() }
+    }
+
     private fun startPolling(model: EcuModel?) {
         pollJob?.cancel()
         if (model == null) return
@@ -172,7 +197,10 @@ class DiagnosticSessionRepository(
         pollJob = scope.launch {
             var i = 0
             while (isActive) {
-                val group = tripGroups[i % tripGroups.size]
+                // While in Basic Settings, prioritise the ignition-advance group
+                // so the user sees timing change as they rotate the distributor.
+                val group = if (_basicSettingsActive.value) basicSettingsGroup
+                    else tripGroups[i % tripGroups.size]
                 i++
                 sessionMutex.withLock {
                     client.readMeasuringBlock(group)
@@ -200,6 +228,8 @@ sealed class SessionEvent {
     data object ConnectionLost : SessionEvent()
     data class DtcRead(val count: Int) : SessionEvent()
     data class DtcCleared(val codes: List<String>) : SessionEvent()
+    data object BasicSettingsEntered : SessionEvent()
+    data object BasicSettingsExited : SessionEvent()
     data class UserNote(val note: String) : SessionEvent()
 
     fun describe(): String = when (this) {
@@ -208,6 +238,8 @@ sealed class SessionEvent {
         ConnectionLost -> "Connection lost"
         is DtcRead -> "DTC read: $count fault(s)"
         is DtcCleared -> "DTC cleared: ${codes.joinToString(" ").ifEmpty { "none" }}"
+        BasicSettingsEntered -> "Basic Settings entered"
+        BasicSettingsExited -> "Basic Settings exited"
         is UserNote -> "Note: $note"
     }
 }

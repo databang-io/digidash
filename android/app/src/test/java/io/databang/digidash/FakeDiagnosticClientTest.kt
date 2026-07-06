@@ -73,10 +73,23 @@ class FakeDiagnosticClientTest {
     }
 
     @Test
-    fun `basic settings is unsupported in fake mode`() = runTest {
+    fun `basic settings can be entered and exited in demo mode`() = runTest {
         val client = client()
         client.connect(ConnectionConfig())
-        val error = client.enterBasicSettings(1).exceptionOrNull()!!.asDiagnosticError()
-        assertEquals(DiagnosticError.UnsupportedFunction, error)
+        assertTrue(client.enterBasicSettings(0).isSuccess)
+        assertTrue(client.basicSettingsActive)
+        assertTrue(client.exitBasicSettings().isSuccess)
+        assertTrue(!client.basicSettingsActive)
+    }
+
+    @Test
+    fun `group 11 shows advance near 6 deg in basic settings`() = runTest {
+        val client = client()
+        client.connect(ConnectionConfig())
+        val idle = client.readMeasuringBlock(11).getOrThrow()
+        assertEquals("12", idle.fields[1].raw)
+        client.enterBasicSettings(0)
+        val adjust = client.readMeasuringBlock(11).getOrThrow()
+        assertEquals("6", adjust.fields[1].raw)
     }
 }

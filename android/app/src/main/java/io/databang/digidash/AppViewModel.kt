@@ -118,6 +118,11 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             session.dtcs.collect { list -> _ui.update { it.copy(dtcs = list) } }
         }
         viewModelScope.launch {
+            session.basicSettingsActive.collect { active ->
+                _ui.update { it.copy(ignition = it.ignition.copy(basicSettingsActive = active)) }
+            }
+        }
+        viewModelScope.launch {
             session.lastError.collect { e ->
                 _ui.update { it.copy(errorMessage = e?.userMessage()) }
             }
@@ -195,6 +200,17 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun addLogNote(note: String) = tripLog.addNote(note)
+
+    // --- Basic Settings (ignition timing) ---
+
+    /** Caller (UI) must have shown the confirmation dialog first. */
+    fun enterBasicSettingsConfirmed() {
+        viewModelScope.launch { session.enterBasicSettings(group = 0) }
+    }
+
+    fun exitBasicSettings() {
+        viewModelScope.launch { session.exitBasicSettings() }
+    }
 
     fun refreshLogs() {
         _ui.update { it.copy(logs = container.logRepository.list()) }
@@ -315,13 +331,18 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             }
 
         _ui.update {
-            it.copy(cards = cards, techGroups = techGroups, ignition = deriveIgnition(measurements, state.dtcs))
+            it.copy(
+                cards = cards,
+                techGroups = techGroups,
+                ignition = deriveIgnition(measurements, state.dtcs, it.ignition.basicSettingsActive),
+            )
         }
     }
 
     private fun deriveIgnition(
         measurements: Map<String, InterpretedMeasurement>,
         dtcs: List<InterpretedDtc>,
+        basicSettingsActive: Boolean,
     ): IgnitionState {
         fun value(vararg keys: String): Double? =
             keys.firstNotNullOfOrNull { measurements[it]?.value }
@@ -338,8 +359,10 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             noHallFault = !hasDtc("00515") && !hasDtc("00513"),
             noCoolantFault = !hasDtc("00522"),
             noThrottleFault = !hasDtc("00518") && !hasDtc("00516") && !hasDtc("00517"),
-            basicSettingsSupported = false, // fake backend returns UnsupportedFunction
-            basicSettingsActive = false,
+            // Demo (fake) backend supports Basic Settings; the real adapter path
+            // is validated on the vehicle (ticket 14).
+            basicSettingsSupported = !container.useRealBackend,
+            basicSettingsActive = basicSettingsActive,
         )
     }
 

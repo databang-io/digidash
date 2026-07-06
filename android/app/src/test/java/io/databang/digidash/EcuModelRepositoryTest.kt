@@ -61,6 +61,7 @@ class EcuModelRepositoryTest {
             listOf(
                 "rpm", "coolant_temp", "battery_voltage", "intake_air_temp",
                 "injection_time", "engine_load", "throttle_angle", "lambda_signal",
+                "ignition_advance",
             ),
             keys,
         )
