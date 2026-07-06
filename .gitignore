@@ -1,0 +1,13 @@
+.gradle/
+build/
+local.properties
+*.apk
+*.aab
+*.iml
+.idea/
+.DS_Store
+*.zip
+/tmp/
+ross_tech_labels.zip
+converted_ecu_models/
+

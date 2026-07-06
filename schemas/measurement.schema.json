@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Measurement Snapshot",
+  "type": "object",
+  "required": [
+    "timestamp_iso",
+    "ecu_part_number",
+    "measurements"
+  ],
+  "properties": {
+    "timestamp_iso": {
+      "type": "string"
+    },
+    "ecu_part_number": {
+      "type": "string"
+    },
+    "measurements": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}

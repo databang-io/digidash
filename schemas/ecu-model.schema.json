@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ECU Model",
+  "type": "object",
+  "required": [
+    "ecu_model_version",
+    "ecu_part_number",
+    "display_name",
+    "protocol",
+    "groups",
+    "source"
+  ],
+  "properties": {
+    "ecu_model_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "ecu_part_number": {
+      "type": "string",
+      "pattern": "^[A-Z0-9]+$"
+    },
+    "display_name": {
+      "type": "string"
+    },
+    "protocol": {
+      "type": "string"
+    },
+    "system": {
+      "type": "string"
+    },
+    "engine_codes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "compatibility": {
+      "type": "object"
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string"
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "groups": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/group"
+      }
+    },
+    "dtc_catalog": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object"
+      }
+    }
+  },
+  "$defs": {
+    "group": {
+      "type": "object",
+      "required": [
+        "fields"
+      ],
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "polling_priority": {
+          "enum": [
+            "trip",
+            "garage",
+            "manual",
+            "unknown"
+          ]
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/field"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "field": {
+      "type": "object",
+      "required": [
+        "index",
+        "key",
+        "name",
+        "formula"
+      ],
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "key": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "value_type": {
+          "enum": [
+            "number",
+            "string",
+            "enum",
+            "boolean",
+            "unknown"
+          ]
+        },
+        "formula": {
+          "type": "object",
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "enum": [
+                "raw",
+                "scale_offset",
+                "enum",
+                "string",
+                "unsupported"
+              ]
+            },
+            "scale": {
+              "type": "number"
+            },
+            "offset": {
+              "type": "number"
+            },
+            "map": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": true
+        },
+        "critical": {
+          "type": "boolean"
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "thresholds": {
+          "type": "object"
+        },
+        "display": {
+          "type": "object"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

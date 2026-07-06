@@ -1,0 +1,3 @@
+timestamp_iso,ecu_part_number,group,field_index,raw_string,interpreted_key,interpreted_value,unit,status,confidence
+2026-07-06T12:00:00+02:00,037906024AG,1,1,920,rpm,920,rpm,normal,low
+

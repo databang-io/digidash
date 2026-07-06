@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LBL Conversion Report",
+  "type": "object",
+  "required": [
+    "input",
+    "output",
+    "models",
+    "warnings"
+  ],
+  "properties": {
+    "input": {
+      "type": "string"
+    },
+    "output": {
+      "type": "string"
+    },
+    "models": {
+      "type": "array"
+    },
+    "warnings": {
+      "type": "array"
+    }
+  }
+}

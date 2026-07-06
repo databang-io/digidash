@@ -1,0 +1,203 @@
+{
+  "ecu_model_version": 1,
+  "ecu_part_number": "037906024AG",
+  "display_name": "VW Digifant 2E - 037 906 024 AG",
+  "protocol": "KWP1281",
+  "system": "Digifant",
+  "engine_codes": [
+    "2E"
+  ],
+  "source": {
+    "type": "manual-bootstrap",
+    "confidence": "low",
+    "notes": "Bootstrap model. Must be validated against converted Ross-Tech LBL and real vehicle logs."
+  },
+  "compatibility": {
+    "vehicle_notes": "VW T3 home conversion, engine side 2E, drivetrain side JX."
+  },
+  "groups": {
+    "000": {
+      "label": "Raw bootstrap group",
+      "polling_priority": "garage",
+      "fields": [
+        {
+          "index": 1,
+          "key": "raw_000_1",
+          "name": "Raw field 000/1",
+          "unit": "",
+          "value_type": "unknown",
+          "formula": {
+            "type": "raw"
+          },
+          "confidence": "low"
+        },
+        {
+          "index": 2,
+          "key": "raw_000_2",
+          "name": "Raw field 000/2",
+          "unit": "",
+          "value_type": "unknown",
+          "formula": {
+            "type": "raw"
+          },
+          "confidence": "low"
+        },
+        {
+          "index": 3,
+          "key": "raw_000_3",
+          "name": "Raw field 000/3",
+          "unit": "",
+          "value_type": "unknown",
+          "formula": {
+            "type": "raw"
+          },
+          "confidence": "low"
+        },
+        {
+          "index": 4,
+          "key": "raw_000_4",
+          "name": "Raw field 000/4",
+          "unit": "",
+          "value_type": "unknown",
+          "formula": {
+            "type": "raw"
+          },
+          "confidence": "low"
+        }
+      ]
+    },
+    "001": {
+      "label": "Candidate basic values - validate with LBL/VCDS",
+      "polling_priority": "trip",
+      "fields": [
+        {
+          "index": 1,
+          "key": "rpm",
+          "name": "Engine speed",
+          "unit": "rpm",
+          "value_type": "number",
+          "formula": {
+            "type": "raw"
+          },
+          "critical": true,
+          "confidence": "low",
+          "display": {
+            "trip_card": true,
+            "order": 10
+          }
+        },
+        {
+          "index": 2,
+          "key": "coolant_temp",
+          "name": "Coolant temperature",
+          "unit": "°C",
+          "value_type": "number",
+          "formula": {
+            "type": "raw"
+          },
+          "critical": true,
+          "confidence": "low",
+          "display": {
+            "trip_card": true,
+            "order": 20
+          }
+        },
+        {
+          "index": 3,
+          "key": "battery_voltage",
+          "name": "Battery voltage",
+          "unit": "V",
+          "value_type": "number",
+          "formula": {
+            "type": "raw"
+          },
+          "critical": true,
+          "confidence": "low",
+          "display": {
+            "trip_card": true,
+            "order": 30
+          }
+        },
+        {
+          "index": 4,
+          "key": "idle_state",
+          "name": "Idle/throttle state",
+          "unit": "",
+          "value_type": "unknown",
+          "formula": {
+            "type": "raw"
+          },
+          "critical": true,
+          "confidence": "low",
+          "display": {
+            "trip_card": true,
+            "order": 40
+          }
+        }
+      ]
+    },
+    "002": {
+      "label": "Candidate mixture/air/load values - validate",
+      "polling_priority": "trip",
+      "fields": [
+        {
+          "index": 1,
+          "key": "engine_load",
+          "name": "Engine load / air mass candidate",
+          "unit": "",
+          "value_type": "number",
+          "formula": {
+            "type": "raw"
+          },
+          "confidence": "low"
+        },
+        {
+          "index": 2,
+          "key": "injection_time",
+          "name": "Injection time candidate",
+          "unit": "ms",
+          "value_type": "number",
+          "formula": {
+            "type": "raw"
+          },
+          "confidence": "low",
+          "display": {
+            "trip_card": true,
+            "order": 50
+          }
+        },
+        {
+          "index": 3,
+          "key": "lambda_state",
+          "name": "Lambda state/correction candidate",
+          "unit": "",
+          "value_type": "unknown",
+          "formula": {
+            "type": "raw"
+          },
+          "confidence": "low",
+          "display": {
+            "trip_card": true,
+            "order": 60
+          }
+        },
+        {
+          "index": 4,
+          "key": "ignition_advance",
+          "name": "Ignition advance candidate",
+          "unit": "°BTDC",
+          "value_type": "number",
+          "formula": {
+            "type": "raw"
+          },
+          "confidence": "low",
+          "display": {
+            "trip_card": true,
+            "order": 70
+          }
+        }
+      ]
+    }
+  },
+  "dtc_catalog": {}
+}
