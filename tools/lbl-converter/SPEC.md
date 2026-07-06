@@ -1,12 +1,12 @@
-# 06 — Ross-Tech LBL Conversion
+# Label Converter Specification
 
 ## Purpose
 
-Convert a local user-provided Ross-Tech label ZIP into internal ECU Models.
+Convert a local user-provided user-provided label ZIP into internal ECU Models.
 
 ## Legal/design boundary
 
-The application must not ship original Ross-Tech `.LBL` files. The user can provide a ZIP from their own installation for local conversion. Generated ECU Model files should include source metadata but not large verbatim chunks of label file content beyond short field names/units necessary for user interpretation.
+The application must not ship original third-party label files (.LBL). The user can provide a ZIP from their own installation for local conversion. Generated ECU Model files should include source metadata but not large verbatim chunks of label file content beyond short field names/units necessary for user interpretation.
 
 ## Input
 
@@ -43,7 +43,7 @@ Implementation can be Kotlin/JVM or Python for MVP. If Android project is Kotlin
 
 ## Parsing assumptions
 
-Ross-Tech label syntax varies. The converter must be tolerant.
+label file syntax varies. The converter must be tolerant.
 
 Expected patterns include:
 

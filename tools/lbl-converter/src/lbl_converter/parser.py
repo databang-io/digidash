@@ -1,4 +1,4 @@
-"""Tolerant parser for Ross-Tech VCDS ``.LBL`` label files.
+"""Tolerant parser for ``.LBL`` diagnostic label files.
 
 Only measuring-block lines are extracted. Two line formats are
 accepted:

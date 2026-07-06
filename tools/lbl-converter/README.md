@@ -1,6 +1,6 @@
 # LBL Converter
 
-CLI tool converting a user-provided Ross-Tech label ZIP to Digifant Dashboard ECU Models.
+CLI tool converting a user-provided user-provided label ZIP to Digifant Dashboard ECU Models.
 
 Python 3 stdlib only — no pip dependencies.
 
@@ -61,6 +61,6 @@ cd tools/lbl-converter
 python3 -m unittest discover
 ```
 
-Test fixtures are synthetic `.lbl` files zipped on the fly — no Ross-Tech content is included in the repository.
+Test fixtures are synthetic `.lbl` files zipped on the fly — no real label-pack content is included in the repository.
 
 See `SPEC.md` for full behavior.

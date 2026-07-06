@@ -1,8 +1,44 @@
-# Digifant Dashboard — Android diagnostic for VW 2E / Digifant
+# DigiDash — Android diagnostic for VW 2E / Digifant
 
-This repository is a **complete specification pack for Claude Code**. It describes the Android application, the ECU Model database, the Ross-Tech `.LBL` conversion workflow, and the first implementation tickets.
+**DigiDash** is an Android diagnostic dashboard for old VAG K-line ECUs, starting with the VW 2E Digifant `037 906 024 AG` in a VW T3 home conversion. This repository contains the app, the ECU Model database, the third-party .LBL converter, and the original specification pack.
 
-The first supported vehicle is a VW T3 home conversion with a VW 2E 2.0 8V Digifant engine.
+## Status (phase 1 done)
+
+| Piece | State |
+|---|---|
+| Android app `android/` (Kotlin, Compose, Material 3) | ✅ builds, 27 unit tests green |
+| Gauge dashboard + Tech mode + Home/dongle picker | ✅ works in fake mode, responsive portrait/landscape |
+| Fake ECU backend (samples replay, failure scenarios) | ✅ tickets 01–05 |
+| ECU Model loader: bundled assets + **public git repo** (raw HTTPS, offline cache) | ✅ |
+| ECU Model `037906024AG` (groups 000–010, thresholds, 22 DTC) | ✅ researched, needs vehicle validation (ticket 14) |
+| LBL converter `tools/lbl-converter/` (Python, 32 tests) | ✅ 558 labels → 265 models validated on a real ZIP |
+| Deep OBD adapter protocol documentation | ✅ `docs/DeepOBD-Observed-API.md` |
+| Tickets 06–09 (CSV log, DTC screen, ignition assistant) | ⏳ next |
+| Real Deep OBD adapter in Kotlin (ticket 13), Android Auto | ⏳ backlog |
+
+## Quick start
+
+```bash
+# Build the app (needs Android SDK + JDK 17+)
+cd android
+./gradlew :app:assembleDebug :app:testDebugUnitTest
+adb install app/build/outputs/apk/debug/app-debug.apk
+
+# Convert your own user-provided label ZIP (never committed)
+python3 tools/lbl-converter/lbl-converter \
+  --input ~/Downloads/Labels.zip --output converted_ecu_models --target 037906024AG
+```
+
+In the app: Home → Connect (fake backend, no vehicle needed) → Dashboard.
+Tech tab: raw measuring blocks, failure scenarios, and the *ECU models from
+public git repo* setting (raw base URL of an `ecu_models/` directory, e.g.
+`https://raw.githubusercontent.com/<user>/<repo>/main/ecu_models`).
+
+## Key docs
+
+- `docs/20-Digifant2E-Research.md` — everything known about the 2E/037906024AG groups, Basic Settings procedure, DTC
+- `docs/DeepOBD-Observed-API.md` — dongle probe/SPP/K-line adapter protocol (base for ticket 13)
+- `START_HERE_FOR_CLAUDE.md`, `tickets/` — original spec pack
 
 ## Confirmed target configuration
 
@@ -32,11 +68,11 @@ Build an Android app that does **not** try to be universal. The MVP is a robust 
 - log CSV for trips
 - support DTC read/clear if available
 - support a safe ignition setup assistant using Basic Settings if available
-- generate ECU Models by converting a user-supplied Ross-Tech label ZIP
+- generate ECU Models by converting a user-provided label ZIP
 
 ## Important legal/design rule
 
-Ross-Tech `.LBL` files must **not** be redistributed directly in the application unless the user has rights/permission. The app and tools should support importing/converting a local user-provided ZIP from the user's own VCDS/VCDS-Lite installation. The generated ECU Model is the application's internal representation.
+Third-party label files (.LBL) must **not** be redistributed directly in the application unless the user has rights/permission. The app and tools should support importing/converting a local user-provided ZIP from the user's own VCDS/VCDS-Lite installation. The generated ECU Model is the application's internal representation.
 
 ## Recommended first Claude Code command
 
@@ -48,7 +84,7 @@ Use this repository as context, then read files in this order:
 4. `docs/02-SystemArchitecture.md`
 5. `docs/03-DeepOBDIntegration.md`
 6. `docs/05-ECUModel.md`
-7. `docs/06-RossTechLBL.md`
+7. `docs/06-LabelImport.md`
 8. `docs/08-IgnitionSetup.md`
 9. `tickets/00-ImplementationPlan.md`
 

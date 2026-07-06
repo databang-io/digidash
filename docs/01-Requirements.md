@@ -55,7 +55,7 @@
 
 ### LBL conversion
 
-- The project shall include a conversion tool from user-supplied Ross-Tech `.LBL` ZIP to ECU Model JSON.
+- The project shall include a conversion tool from user-supplied third-party .LBL ZIP to ECU Model JSON.
 - The converter shall resolve label redirects when possible.
 - The converter shall not require distributing original `.LBL` files.
 

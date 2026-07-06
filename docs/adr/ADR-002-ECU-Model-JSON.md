@@ -6,7 +6,7 @@ Accepted.
 
 ## Context
 
-Ross-Tech label files are useful but should not be redistributed directly.
+label files are useful but should not be redistributed directly.
 
 ## Decision
 

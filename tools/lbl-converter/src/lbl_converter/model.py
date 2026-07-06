@@ -36,7 +36,7 @@ def normalize_part_number(value):
 def is_wildcard_filename(filename):
     """True for wildcard label filenames like ``02E-300-0xx.lbl``.
 
-    Ross-Tech uses lowercase ``x`` (single or runs, e.g. ``1C0-920-x2x``)
+    Label packs use lowercase ``x`` (single or runs, e.g. ``1C0-920-x2x``)
     and ``?`` as placeholders in hub files that cover several part
     numbers; such files must not yield a model of their own. A lone
     lowercase ``x`` only counts as a placeholder when the stem is

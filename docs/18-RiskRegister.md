@@ -4,7 +4,7 @@
 
 Mitigation: keep DiagnosticClient abstraction, fake backend, and mark unsupported functions clearly. MVP still works as dashboard if raw block read works.
 
-## R2 — Ross-Tech label format varies too much
+## R2 — label file format varies too much
 
 Mitigation: tolerant parser, warnings, manual correction, do not block conversion because of one bad file.
 

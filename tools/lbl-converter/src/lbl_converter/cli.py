@@ -219,7 +219,7 @@ def convert(input_zip, output_dir, target=None):
 def build_arg_parser():
     parser = argparse.ArgumentParser(
         prog="lbl-converter",
-        description="Convert a Ross-Tech label ZIP into ECU Model JSON "
+        description="Convert a user-provided label ZIP into ECU Model JSON "
                     "files.")
     parser.add_argument("--input", required=True,
                         help="path to the ZIP containing .LBL files")

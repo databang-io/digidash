@@ -2,7 +2,7 @@
 
 ## Purpose
 
-An ECU Model is the app's internal description of how to interpret a specific ECU's diagnostic data. It is not a Ross-Tech label file. It is a normalized JSON representation generated manually or from imported label files.
+An ECU Model is the app's internal description of how to interpret a specific ECU's diagnostic data. It is not a label file. It is a normalized JSON representation generated manually or from imported label files.
 
 ## Main target model
 

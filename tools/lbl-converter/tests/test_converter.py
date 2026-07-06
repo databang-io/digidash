@@ -1,7 +1,7 @@
 """Tests for the LBL -> ECU Model converter.
 
 All .lbl fixtures are SYNTHETIC (invented labels/values), zipped on the
-fly with zipfile. No real Ross-Tech content is used.
+fly with zipfile. No real label-pack content is used.
 """
 
 import io

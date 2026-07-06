@@ -10,7 +10,7 @@
   "source": {
     "type": "lbl-inferred",
     "confidence": "medium",
-    "notes": "Groups 001-010 inferred from sibling Ross-Tech label 037-906-023; group 000 layout candidate from successor 037-906-025-ADY; thresholds and DTC catalog from consolidated web research (docs/20-Digifant2E-Research.md). No official label exists for 037-906-024. Validate on real vehicle (ticket 14). Groups >0 may return invalid on some firmwares - fall back to group 000."
+    "notes": "Groups 001-010 inferred from sibling label file 037-906-023; group 000 layout candidate from successor 037-906-025-ADY; thresholds and DTC catalog from consolidated web research (docs/20-Digifant2E-Research.md). No official label exists for 037-906-024. Validate on real vehicle (ticket 14). Groups >0 may return invalid on some firmwares - fall back to group 000."
   },
   "compatibility": {
     "vehicle_notes": "VW T3 home conversion, engine side 2E, drivetrain side JX (flywheel/clutch/bellhousing/gearbox). Do not assume Golf 3 flywheel timing marks.",
