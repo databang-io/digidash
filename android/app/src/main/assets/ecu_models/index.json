@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "models": [
+    {
+      "ecu_part_number": "037906024AG",
+      "display_name": "VW Digifant 2E - 037 906 024 AG",
+      "file": "vw/037906024AG.json",
+      "confidence": "low"
+    }
+  ]
+}
