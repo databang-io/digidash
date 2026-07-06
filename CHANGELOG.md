@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.3.0 — 2026-07-06 (V1)
+
+- CSV logger (ticket 07): `CsvLogger` writes raw + interpreted sample rows and
+  event rows; `LogRepository` stores logs app-private; `TripLogController`
+  records live during a session. Logs screen: start/stop, list, share via
+  FileProvider, delete with confirmation. Local only, no upload.
+- DTC screen (ticket 08): read and interpret fault codes via the ECU-model
+  catalog, coarse severity, guarded clear with the mandatory confirmation
+  dialog (current codes logged before clearing). Fake `WITH_DTCS` scenario.
+- Ignition assistant (ticket 09): mandatory JX/T3 mechanical-timing warning,
+  auto checklist derived from ECU data + manual items, 2E Grundeinstellung
+  guidance, Basic Settings status (unsupported-safe).
+- On-demand raw blocks (ticket 06): group picker in Tech; session mutex
+  serializes K-line access between the poll loop and one-off reads.
+- Deep OBD adapter (ticket 13): `core/deepobd` — BMW-FAST/K-line telegram
+  framing, KWP1281 group + DTC decoding, SPP transport, adapter probe
+  (custom / ELM327 / Deep OBD replacement firmware). `DeepObdDiagnosticClient`
+  behind `DiagnosticClient`; connect + probe implemented, ECU session pending
+  real-vehicle validation (ticket 14). Fake/real backend toggle in Tech.
+- Navigation: 5-tab responsive layout (Dash / Faults / Timing / Logs / Home),
+  Tech reachable from Home. 48 unit tests, all green.
+
 ## 0.2.0 — 2026-07-06 (phase 1)
 
 - DigiDash Android app (tickets 01–05): Kotlin 2.0, Jetpack Compose,

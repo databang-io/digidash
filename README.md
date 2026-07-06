@@ -2,19 +2,28 @@
 
 **DigiDash** is an Android diagnostic dashboard for old VAG K-line ECUs, starting with the VW 2E Digifant `037 906 024 AG` in a VW T3 home conversion. This repository contains the app, the ECU Model database, the third-party .LBL converter, and the original specification pack.
 
-## Status (phase 1 done)
+## Status (V1)
 
 | Piece | State |
 |---|---|
-| Android app `android/` (Kotlin, Compose, Material 3) | ✅ builds, 27 unit tests green |
+| Android app `android/` (Kotlin, Compose, Material 3) | ✅ builds, 48 unit tests green |
 | Gauge dashboard + Tech mode + Home/dongle picker | ✅ works in fake mode, responsive portrait/landscape |
-| Fake ECU backend (samples replay, failure scenarios) | ✅ tickets 01–05 |
+| Fake ECU backend (samples replay, failure scenarios incl. DTCs) | ✅ tickets 01–05 |
 | ECU Model loader: bundled assets + **public git repo** (raw HTTPS, offline cache) | ✅ |
 | ECU Model `037906024AG` (groups 000–010, thresholds, 22 DTC) | ✅ researched, needs vehicle validation (ticket 14) |
+| CSV logger, DTC screen (guarded clear), ignition assistant, on-demand raw blocks | ✅ tickets 06–09 |
 | LBL converter `tools/lbl-converter/` (Python, 32 tests) | ✅ 558 labels → 265 models validated on a real ZIP |
-| Deep OBD adapter protocol documentation | ✅ `docs/DeepOBD-Observed-API.md` |
-| Tickets 06–09 (CSV log, DTC screen, ignition assistant) | ⏳ next |
-| Real Deep OBD adapter in Kotlin (ticket 13), Android Auto | ⏳ backlog |
+| Deep OBD adapter in Kotlin (`core/deepobd`, ticket 13) | ✅ connect + probe + protocol; ECU session pending vehicle (ticket 14) |
+| Real-vehicle validation (ticket 14), Android Auto | ⏳ backlog |
+
+## Screens
+
+- **Home** — connection, ECU identity, Bluetooth dongle picker, entry to Tech mode
+- **Dash** — trip gauges (RPM, coolant, battery, IAT, injection…), N/A-safe, stale/status states
+- **Faults** — DTCs with catalog descriptions, guarded clear
+- **Timing** — ignition assistant with the mandatory JX/T3 warning and 2E Grundeinstellung checklist
+- **Logs** — record CSV (raw + interpreted), share, delete
+- **Tech** — raw measuring blocks, on-demand group reads, fake/real backend toggle, remote ECU-model repo
 
 ## Quick start
 
