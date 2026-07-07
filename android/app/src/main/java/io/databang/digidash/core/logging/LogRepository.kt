@@ -28,8 +28,12 @@ class LogRepository(private val context: Context) {
 
     fun openWriter(file: File): FileWriter = FileWriter(file, false)
 
+    /** All shareable captures: CSV logs, raw traffic dumps, capture exports. */
     fun list(): List<LogFile> =
-        dir.listFiles { f -> f.isFile && f.name.endsWith(".csv") }
+        dir.listFiles { f ->
+            f.isFile && (f.name.endsWith(".csv") || f.name.endsWith(".log") ||
+                f.name.endsWith(".txt") || f.name.endsWith(".json"))
+        }
             .orEmpty()
             .map { LogFile(it.name, it.absolutePath, it.length(), it.lastModified()) }
             .sortedByDescending { it.modifiedMillis }
