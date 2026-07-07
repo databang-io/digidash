@@ -172,6 +172,8 @@ fun DigiDashApp(container: AppContainer, sessionHolder: SessionHolder) {
                     onExportCapture = viewModel::exportCapture,
                     onToggleAlerts = viewModel::setAlertsEnabled,
                     onResetPeaks = viewModel::resetPeaks,
+                    onToggleCaptureRaw = viewModel::setCaptureRawTraffic,
+                    onToggleReadOnly = viewModel::setReadOnlyMode,
                 )
             }
         }

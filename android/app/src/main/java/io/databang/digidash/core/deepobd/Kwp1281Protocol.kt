@@ -17,9 +17,11 @@ object Kwp1281Protocol {
     const val TITLE_ACK = 0x09
     const val TITLE_GROUP_REQUEST = 0x29
     const val TITLE_GROUP_RESPONSE = 0xE7
+    const val TITLE_BASIC_SETTING = 0x28
     const val TITLE_DTC_REQUEST = 0x07
     const val TITLE_DTC_RESPONSE = 0xFC
     const val TITLE_DTC_CLEAR = 0x05
+    const val TITLE_END_OUTPUT = 0x06
     const val TITLE_ASCII = 0xF6
     const val TITLE_NO_DATA = 0x0A
 

@@ -49,6 +49,8 @@ fun TechScreen(
     onExportCapture: ((String) -> Unit) -> Unit,
     onToggleAlerts: (Boolean) -> Unit,
     onResetPeaks: () -> Unit,
+    onToggleCaptureRaw: (Boolean) -> Unit,
+    onToggleReadOnly: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -57,6 +59,9 @@ fun TechScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item { BackendCard(state, onToggleRealBackend) }
+        if (state.useRealBackend) {
+            item { LiveSessionCard(state, onToggleCaptureRaw, onToggleReadOnly) }
+        }
         item { AlertsCard(state, onToggleAlerts, onResetPeaks) }
         if (!state.useRealBackend) {
             item { ScenarioCard(state.scenario, onScenario) }
@@ -76,6 +81,39 @@ fun TechScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun LiveSessionCard(
+    state: AppUiState,
+    onToggleCaptureRaw: (Boolean) -> Unit,
+    onToggleReadOnly: (Boolean) -> Unit,
+) {
+    Card {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Live KWP1281 session (vehicle testing)", style = MaterialTheme.typography.titleMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Capture raw traffic", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                Switch(checked = state.captureRawTraffic, onCheckedChange = onToggleCaptureRaw)
+            }
+            Text(
+                "Logs every adapter byte (TX/RX hex) to logs/raw_*.log so the KWP1281 framing " +
+                    "can be debugged from the capture. Share it after a session.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Read-only safe mode", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                Switch(checked = state.readOnlyMode, onCheckedChange = onToggleReadOnly)
+            }
+            Text(
+                "When on, clear-DTC and Basic Settings are refused — zero writes to the ECU " +
+                    "while validating reads. Turn off to test clear/Basic Settings live.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

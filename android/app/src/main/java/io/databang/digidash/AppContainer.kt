@@ -40,9 +40,21 @@ class AppContainer(private val appContext: Context) {
 
     val fakeClient = FakeDiagnosticClient(jitter = true, operationDelayMillis = 200)
 
+    var captureRawTraffic: Boolean
+        get() = prefs.getBoolean(PREF_CAPTURE_RAW, false)
+        set(value) = prefs.edit().putBoolean(PREF_CAPTURE_RAW, value).apply()
+
+    var readOnlyMode: Boolean
+        get() = prefs.getBoolean(PREF_READ_ONLY, false)
+        set(value) {
+            prefs.edit().putBoolean(PREF_READ_ONLY, value).apply()
+            deepObdClient.readOnly = value
+        }
+
     /** Real adapter client; shares the DiagnosticClient interface with the fake. */
     val deepObdClient = DeepObdDiagnosticClient(
         transportFactory = { address -> buildSppTransport(address) },
+        readOnly = prefs.getBoolean(PREF_READ_ONLY, false),
     )
 
     /** Whether the real Deep OBD backend is selected (else fake). */
@@ -57,7 +69,14 @@ class AppContainer(private val appContext: Context) {
     private fun buildSppTransport(address: String): SppTransport {
         val adapter = appContext.getSystemService(BluetoothManager::class.java)?.adapter
             ?: error("No Bluetooth adapter")
-        return AndroidSppTransport(adapter, address)
+        val base = AndroidSppTransport(adapter, address)
+        if (!captureRawTraffic) return base
+        // Tee every byte to logs/raw_<ts>.log for live framing debugging.
+        val file = logRepository.newRawCaptureFile()
+        val writer = file.bufferedWriter()
+        return io.databang.digidash.core.deepobd.LoggingSppTransport(base, { line ->
+            runCatching { writer.appendLine(line); writer.flush() }
+        })
     }
 
     /**
@@ -86,6 +105,8 @@ class AppContainer(private val appContext: Context) {
         const val PREF_USE_REAL_BACKEND = "use_real_backend"
         const val PREF_CARD_ORDER = "dashboard_card_order"
         const val PREF_ALERTS_ENABLED = "alerts_enabled"
+        const val PREF_CAPTURE_RAW = "capture_raw_traffic"
+        const val PREF_READ_ONLY = "read_only_mode"
 
         const val DEFAULT_REMOTE_REPO_HINT =
             "https://raw.githubusercontent.com/<user>/<repo>/main/ecu_models"

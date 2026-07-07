@@ -48,6 +48,8 @@ data class AppUiState(
     val remoteRepoEnabled: Boolean = false,
     val useRealBackend: Boolean = false,
     val alertsEnabled: Boolean = true,
+    val captureRawTraffic: Boolean = false,
+    val readOnlyMode: Boolean = false,
     /** Min/max per card key over the session (peak hold). */
     val peaks: Map<String, io.databang.digidash.core.history.PeakHold> = emptyMap(),
     val errorMessage: String? = null,
@@ -98,6 +100,8 @@ class AppViewModel(
             remoteRepoEnabled = container.prefs.getBoolean(AppContainer.PREF_REMOTE_REPO_ENABLED, false),
             useRealBackend = container.useRealBackend,
             alertsEnabled = container.alertsEnabled,
+            captureRawTraffic = container.captureRawTraffic,
+            readOnlyMode = container.readOnlyMode,
             selectedDongle = savedDongle(),
         )
     )
@@ -296,6 +300,16 @@ class AppViewModel(
     fun setUseRealBackend(enabled: Boolean) {
         container.useRealBackend = enabled
         _ui.update { it.copy(useRealBackend = enabled) }
+    }
+
+    fun setCaptureRawTraffic(enabled: Boolean) {
+        container.captureRawTraffic = enabled
+        _ui.update { it.copy(captureRawTraffic = enabled) }
+    }
+
+    fun setReadOnlyMode(enabled: Boolean) {
+        container.readOnlyMode = enabled
+        _ui.update { it.copy(readOnlyMode = enabled) }
     }
 
     fun refreshDongles() {

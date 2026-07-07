@@ -43,4 +43,16 @@ class LogRepository(private val context: Context) {
         file.writeText(json)
         return file
     }
+
+    /** A fresh raw-traffic capture file (hex dump of adapter bytes). */
+    fun newRawCaptureFile(): File {
+        val stamp = System.currentTimeMillis()
+        return File(dir, "raw_$stamp.log")
+    }
+
+    fun listRawCaptures(): List<LogFile> =
+        dir.listFiles { f -> f.isFile && f.name.startsWith("raw_") && f.name.endsWith(".log") }
+            .orEmpty()
+            .map { LogFile(it.name, it.absolutePath, it.length(), it.lastModified()) }
+            .sortedByDescending { it.modifiedMillis }
 }
