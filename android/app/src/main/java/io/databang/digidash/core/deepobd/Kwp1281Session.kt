@@ -26,6 +26,8 @@ import io.databang.digidash.domain.model.RawMeasuringBlock
  * real contact will likely need one of these flipped.
  */
 data class Kwp1281Config(
+    /** Let the adapter firmware auto-detect the ECU baud (default) vs fixed 9600. */
+    val autoBaud: Boolean = true,
     /** 5-baud init line driver: "both" (K+L, default), "l", or "k". */
     val initLine: String = "both",
     /** RX de-pairing: the adapter returns raw K-line bytes, so default OFF. */
@@ -60,27 +62,34 @@ class Kwp1281Session(
             "k" -> AdapterProtocol.PULSE_FLAGS_K
             else -> AdapterProtocol.PULSE_FLAGS_BOTH
         }
-        val pulse = AdapterProtocol.pulseTelegram(ecuAddress, baud = baud, flags1 = flags1)
-        android.util.Log.i(TAG, "kwp: TX pulse(addr=$ecuAddress baud=$baud line=${config.initLine}) ${hexOf(pulse)}")
+        // In auto-baud mode the pulse carries the BaudAuto sentinel and the
+        // adapter firmware measures the ECU sync + sends the ~KB2 ack itself.
+        val pulseBaud = if (config.autoBaud) AdapterProtocol.BAUD_AUTO else baud
+        val pulse = AdapterProtocol.pulseTelegram(ecuAddress, baud = pulseBaud, flags1 = flags1)
+        android.util.Log.i(TAG, "kwp: TX pulse(addr=$ecuAddress auto=${config.autoBaud} line=${config.initLine}) ${hexOf(pulse)}")
+        counter = 0
         transport.write(pulse)
 
-        // The adapter clocks the address for ~2 s, then the ECU replies on the
-        // K-line: 1 sync byte + 2 key bytes (raw, no status pairing).
-        val init = readRaw(4000)
-        android.util.Log.i(TAG, "kwp: RX init ${init.size}: ${hexOf(init)}")
-        if (init.size < 3) error("no sync/keybytes from ECU after init (ignition on? K-line?)")
-        val sync = init[0].toInt() and 0xFF
-        val kb2Raw = init[2].toInt() and 0xFF
-        android.util.Log.i(TAG, "kwp: sync=0x%02X kb1=0x%02X kb2=0x%02X".format(
-            sync, init[1].toInt() and 0xFF, kb2Raw))
-
-        // Key-byte handshake: after 40 ms, send the complement of key byte 2.
-        // This is what actually starts the KWP1281 session.
-        Thread.sleep(40)
-        val complement = kb2Raw.inv() and 0xFF
-        counter = 0
-        android.util.Log.i(TAG, "kwp: TX ~KB2 = 0x%02X".format(complement))
-        transport.write(AdapterProtocol.kLineTelegram(baud, byteArrayOf(complement.toByte())))
+        if (config.autoBaud) {
+            // Adapter returns 2 bytes = baud/2 big-endian, then 2 key bytes.
+            val baudBytes = readExact(2, 4000)
+            android.util.Log.i(TAG, "kwp: RX baud ${hexOf(baudBytes)}")
+            if (baudBytes.size < 2) error("no wake response (ignition on? K-line?)")
+            val detected = (((baudBytes[0].toInt() and 0xFF) shl 8) or (baudBytes[1].toInt() and 0xFF)) shl 1
+            android.util.Log.i(TAG, "kwp: detected baud = $detected")
+            if (detected == 0) error("invalid baud detected")
+            val kb = readExact(2, 1500)
+            android.util.Log.i(TAG, "kwp: RX keybytes ${hexOf(kb)}")
+            // Firmware sends the ~KB2 complement itself; host does nothing here.
+        } else {
+            // Legacy path: 1 sync byte + 2 key bytes, host sends ~KB2.
+            val init = readRaw(4000)
+            android.util.Log.i(TAG, "kwp: RX init ${init.size}: ${hexOf(init)}")
+            if (init.size < 3) error("no sync/keybytes from ECU after init")
+            val kb2Raw = init[2].toInt() and 0xFF
+            Thread.sleep(40)
+            transport.write(AdapterProtocol.kLineTelegram(baud, byteArrayOf((kb2Raw.inv() and 0xFF).toByte())))
+        }
 
         // Pump ID blocks: read a block, ACK it, until the ECU sends an ACK block.
         idBlocks.clear()
@@ -210,6 +219,17 @@ class Kwp1281Session(
             i += 2
         }
         return oddHigh == 0
+    }
+
+    /** Read exactly [n] bytes (accumulating) or return what arrived before timeout. */
+    private fun readExact(n: Int, timeoutMs: Long): ByteArray {
+        val out = ArrayList<Byte>(n)
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (out.size < n && System.currentTimeMillis() < deadline) {
+            val c = transport.read(n - out.size, 200)
+            if (c.isNotEmpty()) out.addAll(c.toList())
+        }
+        return out.toByteArray()
     }
 
     private fun readRaw(timeoutMs: Long): ByteArray {

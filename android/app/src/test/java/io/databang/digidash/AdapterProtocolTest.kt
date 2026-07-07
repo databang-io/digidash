@@ -46,17 +46,28 @@ class AdapterProtocolTest {
     }
 
     @Test
-    fun `pulse telegram matches EdiabasLib format for addr 1 at 9600`() {
-        val t = AdapterProtocol.pulseTelegram(address = 0x01, baud = 9600)
+    fun `pulse telegram matches EdiabasLib L-line format for addr 1 at 9600`() {
+        val t = AdapterProtocol.pulseTelegram(
+            address = 0x01, baud = 9600, flags1 = AdapterProtocol.PULSE_FLAGS_L)
         // 00 02 12 C0 38 01 00 3C 00 05 C8 0A 02 02 0A 2E
         val expected = intArrayOf(
             0x00, 0x02, 0x12, 0xC0, 0x38, 0x01, 0x00, 0x3C,
             0x00, 0x05, 0xC8, 0x0A, 0x02, 0x02, 0x0A, 0x2E,
         ).map { it.toByte() }.toByteArray()
         assertArrayEquals(expected, t)
-        // flags1 = SEND_PULSE | NO_ECHO | USE_LLINE
-        assertTrue((t[4].toInt() and AdapterProtocol.KLINEF1_SEND_PULSE) != 0)
-        assertTrue((t[4].toInt() and AdapterProtocol.KLINEF1_USE_LLINE) != 0)
+    }
+
+    @Test
+    fun `auto-baud pulse telegram uses BaudAuto sentinel and both lines`() {
+        val t = AdapterProtocol.pulseTelegram(
+            address = 0x01, baud = AdapterProtocol.BAUD_AUTO,
+            flags1 = AdapterProtocol.PULSE_FLAGS_BOTH)
+        // 00 02 00 01 B8 01 00 3C 00 05 C8 0A 02 02 0A DD
+        val expected = intArrayOf(
+            0x00, 0x02, 0x00, 0x01, 0xB8, 0x01, 0x00, 0x3C,
+            0x00, 0x05, 0xC8, 0x0A, 0x02, 0x02, 0x0A, 0xDD,
+        ).map { it.toByte() }.toByteArray()
+        assertArrayEquals(expected, t)
     }
 
     @Test

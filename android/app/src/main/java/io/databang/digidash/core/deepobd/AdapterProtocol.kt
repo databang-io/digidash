@@ -27,6 +27,9 @@ object AdapterProtocol {
 
     const val KWP1281_TIMEOUT = 60
 
+    /** Sentinel baud that makes the adapter auto-detect the ECU baud (baud/2 = 1). */
+    const val BAUD_AUTO = 2
+
     /** 8-bit additive checksum used by the BMW-FAST framing. */
     fun checksum(bytes: ByteArray, from: Int = 0, to: Int = bytes.size): Int {
         var sum = 0
