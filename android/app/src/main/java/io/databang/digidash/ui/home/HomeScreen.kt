@@ -149,6 +149,12 @@ private fun EcuCard(state: AppUiState) {
                 identity.protocol?.let {
                     Text("Protocol: $it", style = MaterialTheme.typography.bodySmall)
                 }
+                Text(
+                    text = "VIN: " + (identity.vin ?: "Not reported by this ECU"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (identity.vin != null) MaterialTheme.colorScheme.onSurface
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             HorizontalDivider()
             val model = state.model

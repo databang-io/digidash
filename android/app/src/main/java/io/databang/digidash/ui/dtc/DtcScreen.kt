@@ -46,8 +46,11 @@ fun DtcScreen(
     state: AppUiState,
     onRefresh: () -> Unit,
     onClearConfirmed: () -> Unit,
+    onLoadDemoFaults: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Demo mode = fake backend (useRealBackend is false).
+    val demoMode = !state.useRealBackend
     var showConfirm by remember { mutableStateOf(false) }
 
     Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
@@ -72,6 +75,18 @@ fun DtcScreen(
                 Icon(Icons.Default.CheckCircle, contentDescription = null, tint = StatusColors.normal)
                 Spacer(Modifier.width(8.dp))
                 Text("No fault codes stored.", style = MaterialTheme.typography.bodyLarge)
+            }
+            if (demoMode) {
+                Spacer(Modifier.height(16.dp))
+                OutlinedButton(onClick = onLoadDemoFaults) {
+                    Text("Load demo faults")
+                }
+                Text(
+                    "Demo only: injects sample faults (Hall sensor, coolant sensor…) so you " +
+                        "can try reading and clearing codes.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         } else {
             LazyColumn(

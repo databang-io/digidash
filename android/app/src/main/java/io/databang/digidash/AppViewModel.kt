@@ -201,6 +201,11 @@ class AppViewModel(
         }
     }
 
+    /** Demo helper: switch the fake backend to the fault scenario and re-read. */
+    fun loadDemoFaults() {
+        setScenario(FakeScenario.WITH_DTCS)
+    }
+
     // --- Logging ---
 
     fun toggleRecording() {

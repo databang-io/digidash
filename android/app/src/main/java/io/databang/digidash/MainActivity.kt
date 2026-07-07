@@ -141,6 +141,7 @@ fun DigiDashApp(container: AppContainer, sessionHolder: SessionHolder) {
                     state = state,
                     onRefresh = viewModel::refreshDtcs,
                     onClearConfirmed = viewModel::clearDtcsConfirmed,
+                    onLoadDemoFaults = viewModel::loadDemoFaults,
                 )
             }
             composable(Destination.IGNITION.route) {

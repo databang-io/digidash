@@ -42,11 +42,18 @@ enum class FakeScenario { NORMAL, WITH_DTCS, DONGLE_NOT_FOUND, ECU_NO_RESPONSE, 
  */
 class FakeDiagnosticClient(
     sampleJson: String = DEFAULT_SAMPLE_JSON,
-    var scenario: FakeScenario = FakeScenario.NORMAL,
+    scenario: FakeScenario = FakeScenario.NORMAL,
     private val jitter: Boolean = false,
     private val operationDelayMillis: Long = 150,
     private val clock: () -> Long = { System.currentTimeMillis() },
 ) : DiagnosticClient {
+
+    /** Re-arm the demo faults whenever the fault scenario is (re)selected. */
+    var scenario: FakeScenario = scenario
+        set(value) {
+            if (value == FakeScenario.WITH_DTCS) dtcsCleared = false
+            field = value
+        }
 
     private val sample: FakeSampleData =
         Json { ignoreUnknownKeys = true }.decodeFromString(sampleJson)
@@ -85,6 +92,9 @@ class FakeDiagnosticClient(
                 component = "DIGIFANT 2E",
                 serialNumber = "FAKE-0001",
                 protocol = "KWP1281",
+                // Demo VIN (T3 format) so the layout is visible; a real 2E
+                // Digifant ECU typically reports no VIN.
+                vin = "WV2ZZZ25ZFH000000",
             )
         )
     }

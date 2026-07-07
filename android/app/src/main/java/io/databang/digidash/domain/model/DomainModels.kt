@@ -7,6 +7,8 @@ data class EcuIdentity(
     val component: String,
     val serialNumber: String? = null,
     val protocol: String? = null,
+    /** VIN if the ECU reports one. Old KWP1281 Digifant ECUs usually do not. */
+    val vin: String? = null,
 ) {
     companion object {
         /** `037 906 024 AG` / `037-906-024-ag` -> `037906024AG` */
@@ -18,12 +20,14 @@ data class EcuIdentity(
             component: String,
             serialNumber: String? = null,
             protocol: String? = null,
+            vin: String? = null,
         ): EcuIdentity = EcuIdentity(
             partNumberRaw = partNumberRaw,
             partNumberNormalized = normalizePartNumber(partNumberRaw),
             component = component,
             serialNumber = serialNumber,
             protocol = protocol,
+            vin = vin,
         )
     }
 }
