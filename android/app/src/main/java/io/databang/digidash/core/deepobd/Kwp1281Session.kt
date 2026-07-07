@@ -191,7 +191,9 @@ class Kwp1281Session(
     }
 
     fun readDtc(): Result<List<RawDtc>> = runCatching {
-        val resp = exchange(Kwp1281Protocol.TITLE_DTC_REQUEST, ByteArray(0), collectUntilAck = true)
+        // The ECU returns all stored codes in a single 0xFC block; deliver on the
+        // first response rather than waiting for an ACK that may never come.
+        val resp = exchange(Kwp1281Protocol.TITLE_DTC_REQUEST, ByteArray(0))
         resp.filter { it.title == Kwp1281Protocol.TITLE_DTC_RESPONSE }
             .flatMap { Kwp1281Protocol.decodeDtcResponse(it.data) }
     }
