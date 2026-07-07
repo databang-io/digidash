@@ -187,11 +187,14 @@ class DiagnosticSessionRepository(
     private fun startPolling(model: EcuModel?) {
         pollJob?.cancel()
         if (model == null) return
-        val tripGroups = model.groups
+        // Poll every group the dashboard needs: the trip-priority groups PLUS
+        // any group that holds a trip-card field (throttle, lambda, ignition
+        // advance live in "garage" groups but still have dashboard cards).
+        val tripPriority = model.groups
             .filter { (_, group) -> group.pollingPriority == "trip" }
             .keys.mapNotNull { it.toIntOrNull() }
-            .sorted()
-            .ifEmpty { model.tripCardFields().map { it.first }.distinct() }
+        val cardGroups = model.tripCardFields().map { it.first }
+        val tripGroups = (tripPriority + cardGroups).distinct().sorted()
         if (tripGroups.isEmpty()) return
 
         pollJob = scope.launch {

@@ -23,8 +23,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import io.databang.digidash.domain.model.DashboardCardState
 import io.databang.digidash.domain.model.MeasurementStatus
 import io.databang.digidash.ui.theme.StatusColors
@@ -35,16 +37,22 @@ private data class GaugeRange(val min: Double, val max: Double)
 private val gaugeRanges = mapOf(
     "rpm" to GaugeRange(0.0, 7000.0),
     "coolant_temp" to GaugeRange(-20.0, 130.0),
+    "coolant_temp_000" to GaugeRange(-20.0, 130.0),
     "battery_voltage" to GaugeRange(8.0, 16.0),
+    "intake_air_temp" to GaugeRange(-20.0, 90.0),
     "injection_time" to GaugeRange(0.0, 20.0),
-    "ignition_advance" to GaugeRange(-10.0, 50.0),
     "engine_load" to GaugeRange(0.0, 100.0),
+    "throttle_angle" to GaugeRange(0.0, 90.0),
+    "lambda_signal" to GaugeRange(0.0, 100.0),
+    "ignition_advance" to GaugeRange(-10.0, 50.0),
+    "rpm_000" to GaugeRange(0.0, 7000.0),
 )
 
 @Composable
 fun DashboardScreen(
     cards: List<DashboardCardState>,
     connected: Boolean,
+    onReorder: (List<String>) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (cards.isEmpty() || !connected) {
@@ -70,24 +78,25 @@ fun DashboardScreen(
         return
     }
 
-    // Adaptive grid: phones portrait ≈ 2 columns, landscape / tablets more.
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 168.dp),
-        modifier = modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        items(cards, key = { it.key }) { card ->
-            DashboardCard(card)
-        }
-    }
+    // Adaptive grid; long-press a card and drag to reorder (values stay live).
+    ReorderableGaugeGrid(
+        cards = cards,
+        onReorder = onReorder,
+        modifier = modifier,
+        cell = { card, isDragged -> DashboardCard(card, isDragged) },
+    )
 }
 
 @Composable
-private fun DashboardCard(card: DashboardCardState) {
+private fun DashboardCard(card: DashboardCardState, isDragged: Boolean = false) {
     val statusColor = card.statusColor()
+    val elevation = if (isDragged) 12.dp else 0.dp
+    val scale = if (isDragged) 1.06f else 1f
     Card(
+        modifier = Modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .zIndex(if (isDragged) 1f else 0f),
+        elevation = CardDefaults.cardElevation(defaultElevation = elevation),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         ),

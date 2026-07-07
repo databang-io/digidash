@@ -107,7 +107,11 @@ fun DigiDashApp(container: AppContainer, sessionHolder: SessionHolder) {
                 )
             }
             composable(Destination.DASHBOARD.route) {
-                DashboardScreen(cards = state.cards, connected = state.connected)
+                DashboardScreen(
+                    cards = state.cards,
+                    connected = state.connected,
+                    onReorder = viewModel::saveCardOrder,
+                )
             }
             composable(Destination.DTC.route) {
                 DtcScreen(

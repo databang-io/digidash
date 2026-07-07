@@ -78,6 +78,7 @@ class AppContainer(private val appContext: Context) {
         const val PREF_DONGLE_ADDRESS = "dongle_address"
         const val PREF_DONGLE_NAME = "dongle_name"
         const val PREF_USE_REAL_BACKEND = "use_real_backend"
+        const val PREF_CARD_ORDER = "dashboard_card_order"
 
         const val DEFAULT_REMOTE_REPO_HINT =
             "https://raw.githubusercontent.com/<user>/<repo>/main/ecu_models"

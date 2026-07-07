@@ -79,6 +79,12 @@ class AppViewModel(
     private val session = sessionHolder.session
     private val tripLog = sessionHolder.tripLog
 
+    /** Persisted custom dashboard order (card keys); null = model default order. */
+    private var cardOrder: List<String>? =
+        container.prefs.getString(AppContainer.PREF_CARD_ORDER, null)
+            ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+            ?.takeIf { it.isNotEmpty() }
+
     private val _ui = MutableStateFlow(
         AppUiState(
             remoteRepoUrl = container.prefs.getString(AppContainer.PREF_REMOTE_REPO_URL, "") ?: "",
@@ -255,6 +261,11 @@ class AppViewModel(
     fun setScenario(scenario: FakeScenario) {
         container.fakeClient.scenario = scenario
         _ui.update { it.copy(scenario = scenario) }
+        // Re-read DTCs so switching to "with dtcs" immediately shows faults
+        // (and clears them when switching back) without a manual refresh.
+        if (_ui.value.connected) {
+            viewModelScope.launch { session.refreshDtcs() }
+        }
     }
 
     fun setUseRealBackend(enabled: Boolean) {
@@ -339,6 +350,8 @@ class AppViewModel(
             )
         }
 
+        val orderedCards = applyCardOrder(cards)
+
         val techGroups = measurements.values
             .groupBy { it.group }
             .toSortedMap()
@@ -353,11 +366,31 @@ class AppViewModel(
 
         _ui.update {
             it.copy(
-                cards = cards,
+                cards = orderedCards,
                 techGroups = techGroups,
                 ignition = deriveIgnition(measurements, state.dtcs, it.ignition.basicSettingsActive),
             )
         }
+    }
+
+    /** Reorder cards by the saved custom order; unknown keys keep model order at the end. */
+    private fun applyCardOrder(cards: List<DashboardCardState>): List<DashboardCardState> {
+        val order = cardOrder ?: return cards
+        val rank = order.withIndex().associate { (i, key) -> key to i }
+        return cards.sortedBy { rank[it.key] ?: (order.size + cards.indexOf(it)) }
+    }
+
+    /** Persist a new dashboard order (called from drag-and-drop). */
+    fun saveCardOrder(keys: List<String>) {
+        cardOrder = keys
+        container.prefs.edit().putString(AppContainer.PREF_CARD_ORDER, keys.joinToString(",")).apply()
+        _ui.update { it.copy(cards = applyCardOrder(it.cards)) }
+    }
+
+    fun resetCardOrder() {
+        cardOrder = null
+        container.prefs.edit().remove(AppContainer.PREF_CARD_ORDER).apply()
+        rebuildDerivedState(session.measurements.value)
     }
 
     private fun deriveIgnition(
@@ -388,7 +421,9 @@ class AppViewModel(
     }
 
     companion object {
-        private const val STALE_AFTER_MILLIS = 5_000L
+        // One group per poll cycle on a slow K-line: with ~6 dashboard groups a
+        // full refresh takes several seconds, so allow generous staleness.
+        private const val STALE_AFTER_MILLIS = 12_000L
 
         fun factory(container: AppContainer, sessionHolder: SessionHolder): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
