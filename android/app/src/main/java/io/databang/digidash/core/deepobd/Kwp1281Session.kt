@@ -241,18 +241,34 @@ class Kwp1281Session(
     private val TAG = "DIGIDASH_DBG"
     private fun hexOf(b: ByteArray) = b.joinToString(" ") { "%02X".format(it.toInt() and 0xFF) }
 
+    /**
+     * Read one block using the KWP1281 length prefix (OBDisplay-Uno approach):
+     * read the length byte, then exactly that many more bytes. This avoids the
+     * "stop at first 0x03" bug (short blocks like the ACK start with 0x03 as
+     * their length) and tolerates the slow, gappy byte stream at low baud.
+     * When [Kwp1281Config.depair] is on, every logical byte is a (data,status)
+     * pair on the wire, so we read/skip two raw bytes per logical byte.
+     */
     private fun readBlock(): Block? {
-        val raw = readRaw(blockTimeoutMs)
-        android.util.Log.i(TAG, "kwp: RX block ${raw.size}: ${hexOf(raw)}")
-        if (raw.isEmpty()) return null
-        val bytes = depair(raw)
-        if (bytes.size < 4) return null
-        // [len][counter][title][data...][0x03]
-        val len = bytes[0].toInt() and 0xFF
-        val blkCounter = bytes[1].toInt() and 0xFF
-        val title = bytes[2].toInt() and 0xFF
-        val endIdx = bytes.indexOfLast { it.toInt() and 0xFF == 0x03 }.let { if (it < 3) bytes.size else it }
-        val data = bytes.copyOfRange(3, endIdx.coerceAtMost(bytes.size))
+        val unit = if (config.depair == "on") 2 else 1
+        val head = readExact(unit, blockTimeoutMs)
+        if (head.size < unit) return null
+        val len = head[0].toInt() and 0xFF
+        if (len < 3 || len > 64) {
+            android.util.Log.i(TAG, "kwp: RX block bad len=$len ${hexOf(head)}")
+            return null
+        }
+        // Remaining logical bytes: counter, title, payload..., 0x03.
+        val body = readExact(len * unit, blockTimeoutMs)
+        if (body.size < len * unit) {
+            android.util.Log.i(TAG, "kwp: RX block short ${body.size}/${len * unit}")
+            return null
+        }
+        val logical = ByteArray(len) { body[it * unit] }
+        android.util.Log.i(TAG, "kwp: RX block len=$len ${hexOf(byteArrayOf(len.toByte()) + logical)}")
+        val blkCounter = logical[0].toInt() and 0xFF
+        val title = logical[1].toInt() and 0xFF
+        val data = if (len >= 3) logical.copyOfRange(2, len - 1) else ByteArray(0)
         counter = blkCounter
         return Block(blkCounter, title, data)
     }

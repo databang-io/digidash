@@ -31,20 +31,38 @@ object Kwp1281Protocol {
         fun toRawField(index: Int): RawField = RawField(index = index, raw = display())
 
         fun display(): String {
+            // Type 10 is a boolean flag (warm-up), not a number.
+            if (type == 0x0A) return if (b != 0) "WARM" else "COLD"
             val v = value()
             return v?.let { formatNumber(it) } ?: "$a/$b"
         }
 
-        /** Physical value per the standard KW1281 type table, when known. */
+        /**
+         * Physical value per the standard KW1281 measuring-block type table
+         * (matched to RXTX4816/OBDisplay-Uno's KWPSensorDecode). Unknown/flag
+         * types return null so the UI shows raw a/b rather than a fake 0.
+         */
         fun value(): Double? = when (type) {
-            0x01 -> 0.2 * a * b               // rpm
-            0x05 -> a * (b - 100) * 0.1       // temperature °C
-            0x06 -> 0.001 * a * b             // voltage
-            0x07 -> 0.01 * a * b              // speed km/h
-            0x0F -> 0.01 * a * b              // time ms
-            0x12 -> 0.001 * a * b             // pressure/voltage
-            0x21 -> if (a != 0) 100.0 * b / a else null // percent (null, never fake 0)
-            0x04, 0x1B -> kotlin.math.abs(b - 127) * 0.01 * a // ignition deg
+            0x01 -> 0.2 * a * b                       // rpm
+            0x02 -> 0.002 * a * b                     // %
+            0x03 -> 0.002 * a * b                     // degrees
+            0x04 -> kotlin.math.abs(b - 127) * 0.01 * a // ATDC ignition
+            0x05 -> (b - 100) * 0.1 * a               // temperature °C
+            0x06 -> 0.001 * a * b                     // voltage
+            0x07 -> 0.01 * a * b                      // speed km/h
+            0x08 -> 0.1 * a * b                       // raw scaled
+            0x09 -> (b - 127) * 0.02 * a              // degrees
+            0x0B -> 0.0001 * a * (b - 128) + 1.0      // lambda
+            0x0E -> 0.005 * a * b                     // bar
+            0x0F -> 0.01 * a * b                      // time ms
+            0x12 -> 0.04 * a * b                      // mbar
+            0x15 -> 0.001 * a * b                     // voltage
+            0x16 -> 0.001 * a * b                     // time ms
+            0x17 -> a * b / 256.0                     // %
+            0x1B -> kotlin.math.abs(b - 128) * 0.01 * a // degrees
+            0x21 -> if (a != 0) 100.0 * b / a else 100.0 * b // %
+            0x22 -> (b - 128) * 0.01 * a              // kW
+            0x23 -> 0.01 * a * b                      // l/h
             else -> null
         }
     }
