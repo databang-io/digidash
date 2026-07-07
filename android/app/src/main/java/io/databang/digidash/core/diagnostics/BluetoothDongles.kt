@@ -1,16 +1,21 @@
 package io.databang.digidash.core.diagnostics
 
 import android.Manifest
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
 
-/** A candidate Bluetooth OBD dongle (paired device). */
+/** A candidate Bluetooth OBD dongle. [paired] false = found by discovery. */
 data class DongleDevice(
     val name: String,
     val address: String,
+    val paired: Boolean = true,
 )
 
 /**
@@ -23,13 +28,22 @@ interface DongleProvider {
     /** True when listing paired devices is currently permitted. */
     fun hasPermission(): Boolean
 
-    /** Runtime permissions the UI must request before [pairedDevices] works. */
+    /** Runtime permissions the UI must request before scan/connect works. */
     fun requiredPermissions(): List<String>
 
     fun pairedDevices(): List<DongleDevice>
+
+    /**
+     * Start classic Bluetooth discovery (Deep OBD does NOT bond — it discovers
+     * unpaired dongles and connects insecure). [onFound] fires per device;
+     * [onDone] when discovery finishes. Returns a stop() lambda.
+     */
+    fun startDiscovery(onFound: (DongleDevice) -> Unit, onDone: () -> Unit): () -> Unit
 }
 
 class AndroidDongleProvider(private val context: Context) : DongleProvider {
+
+    private val adapter get() = context.getSystemService(BluetoothManager::class.java)?.adapter
 
     override fun hasPermission(): Boolean =
         requiredPermissions().all {
@@ -38,22 +52,58 @@ class AndroidDongleProvider(private val context: Context) : DongleProvider {
 
     override fun requiredPermissions(): List<String> =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            listOf(Manifest.permission.BLUETOOTH_CONNECT)
+            listOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
         } else {
             emptyList()
         }
 
     override fun pairedDevices(): List<DongleDevice> {
         if (!hasPermission()) return emptyList()
-        val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter
-            ?: return emptyList()
-        if (!adapter.isEnabled) return emptyList()
+        val a = adapter ?: return emptyList()
+        if (!a.isEnabled) return emptyList()
         return try {
-            adapter.bondedDevices.orEmpty().map {
-                DongleDevice(name = it.name ?: it.address, address = it.address)
+            a.bondedDevices.orEmpty().map {
+                DongleDevice(name = it.name ?: it.address, address = it.address, paired = true)
             }.sortedBy { it.name.lowercase() }
         } catch (e: SecurityException) {
             emptyList()
+        }
+    }
+
+    override fun startDiscovery(onFound: (DongleDevice) -> Unit, onDone: () -> Unit): () -> Unit {
+        val a = adapter
+        if (!hasPermission() || a == null || !a.isEnabled) { onDone(); return {} }
+
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context, intent: Intent) {
+                when (intent.action) {
+                    BluetoothDevice.ACTION_FOUND -> {
+                        @Suppress("DEPRECATION")
+                        val device: BluetoothDevice? =
+                            intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                        device?.let {
+                            val name = try { it.name } catch (e: SecurityException) { null }
+                            onFound(DongleDevice(name = name ?: it.address, address = it.address, paired = false))
+                        }
+                    }
+                    android.bluetooth.BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> onDone()
+                }
+            }
+        }
+        val filter = IntentFilter().apply {
+            addAction(BluetoothDevice.ACTION_FOUND)
+            addAction(android.bluetooth.BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
+        }
+        ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        try {
+            if (a.isDiscovering) a.cancelDiscovery()
+            a.startDiscovery()
+        } catch (e: SecurityException) {
+            onDone()
+        }
+        return {
+            runCatching { a.cancelDiscovery() }
+            runCatching { context.unregisterReceiver(receiver) }
         }
     }
 }

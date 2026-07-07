@@ -3,10 +3,18 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <!-- Listing/connecting to the paired OBD dongle (Deep OBD-style SPP adapter) -->
+    <!-- Listing/connecting to the OBD dongle (Deep OBD-style SPP adapter).
+         Deep OBD does not bond — it discovers + connects insecure, so we need
+         SCAN to find unpaired dongles. neverForLocation avoids the location grant. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+    <uses-permission
         android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN"
         android:maxSdkVersion="30" />
     <!-- Android Auto projection -->
     <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />

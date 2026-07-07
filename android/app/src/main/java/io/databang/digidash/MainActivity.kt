@@ -118,6 +118,7 @@ fun DigiDashApp(container: AppContainer, sessionHolder: SessionHolder) {
                     onDisconnect = viewModel::disconnect,
                     onRefreshDongles = viewModel::refreshDongles,
                     onSelectDongle = viewModel::selectDongle,
+                    onScanDongles = viewModel::scanDongles,
                     onOpenTech = { navigate(Destination.TECH) },
                 )
             }

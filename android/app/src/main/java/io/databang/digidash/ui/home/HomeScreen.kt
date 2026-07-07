@@ -47,6 +47,7 @@ fun HomeScreen(
     onDisconnect: () -> Unit,
     onRefreshDongles: () -> Unit,
     onSelectDongle: (DongleDevice) -> Unit,
+    onScanDongles: () -> Unit,
     onOpenTech: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -74,6 +75,7 @@ fun HomeScreen(
             },
             onRefresh = onRefreshDongles,
             onSelect = onSelectDongle,
+            onScan = onScanDongles,
         )
         OutlinedButton(onClick = onOpenTech, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Default.Build, contentDescription = null)
@@ -187,6 +189,7 @@ private fun DongleCard(
     onRequestPermission: () -> Unit,
     onRefresh: () -> Unit,
     onSelect: (DongleDevice) -> Unit,
+    onScan: () -> Unit,
 ) {
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -196,48 +199,66 @@ private fun DongleCard(
                 Text("Bluetooth dongle", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onRefresh) {
-                    Icon(Icons.Default.Refresh, contentDescription = "Refresh paired devices")
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                 }
             }
             Text(
-                "Pick your paired OBD adapter. For this VAG KWP1281 ECU an ELM327 " +
-                    "with the Deep OBD replacement firmware is required (Deep OBD style). " +
-                    "Ignored in fake mode.",
+                "Deep OBD-style dongles don't need pairing — tap Scan to find the " +
+                    "adapter and connect directly. (Paired devices also show here.) " +
+                    "KWP1281 needs an ELM327 with the Deep OBD replacement firmware. " +
+                    "Ignored in demo mode.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            when {
-                state.bluetoothPermissionNeeded -> {
-                    OutlinedButton(onClick = onRequestPermission) {
-                        Icon(Icons.Default.Link, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Allow Bluetooth access")
-                    }
+            if (state.bluetoothPermissionNeeded) {
+                OutlinedButton(onClick = onRequestPermission) {
+                    Icon(Icons.Default.Link, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Allow Bluetooth access")
                 }
-                state.dongles.isEmpty() -> {
-                    Text(
-                        "No paired devices. Pair the dongle in Android Bluetooth settings first.",
-                        style = MaterialTheme.typography.bodyMedium,
+                return@Column
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(onClick = onScan, enabled = !state.scanning) {
+                    Icon(Icons.Default.Bluetooth, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (state.scanning) "Scanning…" else "Scan for dongles")
+                }
+                if (state.scanning) {
+                    Spacer(Modifier.width(8.dp))
+                    androidx.compose.material3.CircularProgressIndicator(
+                        Modifier.height(18.dp).width(18.dp), strokeWidth = 2.dp,
                     )
                 }
-                else -> {
-                    state.dongles.forEach { dongle ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            RadioButton(
-                                selected = state.selectedDongle?.address == dongle.address,
-                                onClick = { onSelect(dongle) },
+            }
+
+            if (state.dongles.isEmpty()) {
+                Text(
+                    "No devices yet. Make sure the dongle is powered (plugged into the OBD " +
+                        "port) and tap Scan.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else {
+                state.dongles.forEach { dongle ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        RadioButton(
+                            selected = state.selectedDongle?.address == dongle.address,
+                            onClick = { onSelect(dongle) },
+                        )
+                        Column {
+                            Text(
+                                dongle.name + if (!dongle.paired) "  (found)" else "",
+                                style = MaterialTheme.typography.bodyLarge,
                             )
-                            Column {
-                                Text(dongle.name, style = MaterialTheme.typography.bodyLarge)
-                                Text(
-                                    dongle.address,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
+                            Text(
+                                dongle.address,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
                 }

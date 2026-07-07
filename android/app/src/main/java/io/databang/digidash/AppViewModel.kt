@@ -45,6 +45,7 @@ data class AppUiState(
     val scenario: FakeScenario = FakeScenario.NORMAL,
     val dongles: List<DongleDevice> = emptyList(),
     val selectedDongle: DongleDevice? = null,
+    val scanning: Boolean = false,
     val bluetoothPermissionNeeded: Boolean = false,
     val remoteRepoUrl: String = "",
     val remoteRepoEnabled: Boolean = false,
@@ -368,14 +369,47 @@ class AppViewModel(
     fun refreshDongles() {
         val provider = container.dongleProvider
         _ui.update {
+            // Keep any unpaired devices found by discovery; refresh the paired set.
+            val discovered = it.dongles.filter { d -> !d.paired }
+            val merged = (provider.pairedDevices() + discovered)
+                .distinctBy { d -> d.address }
             it.copy(
                 bluetoothPermissionNeeded = !provider.hasPermission(),
-                dongles = provider.pairedDevices(),
+                dongles = merged,
             )
         }
     }
 
     fun bluetoothPermissions(): List<String> = container.dongleProvider.requiredPermissions()
+
+    private var stopScan: (() -> Unit)? = null
+
+    /** Discover unpaired dongles (Deep OBD-style) and merge them into the list. */
+    fun scanDongles() {
+        if (_ui.value.scanning) return
+        stopScan?.invoke()
+        _ui.update { it.copy(scanning = true) }
+        stopScan = container.dongleProvider.startDiscovery(
+            onFound = { dev ->
+                _ui.update { st ->
+                    if (st.dongles.any { it.address == dev.address }) st
+                    else st.copy(dongles = st.dongles + dev)
+                }
+            },
+            onDone = { _ui.update { it.copy(scanning = false) } },
+        )
+    }
+
+    fun stopScanning() {
+        stopScan?.invoke()
+        stopScan = null
+        _ui.update { it.copy(scanning = false) }
+    }
+
+    override fun onCleared() {
+        stopScan?.invoke()
+        super.onCleared()
+    }
 
     fun selectDongle(dongle: DongleDevice) {
         container.prefs.edit()
