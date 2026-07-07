@@ -14,7 +14,7 @@ Package: `io.databang.digidash` — minSdk 26, target/compile 35.
 Needs a JDK 17+ and the Android SDK (`local.properties` → `sdk.dir=...`).
 On this machine: `JAVA_HOME=$HOME/DEV/tools/jdk21`, SDK at `~/Android/Sdk`.
 
-## Structure (per CLAUDE.md architecture)
+## Structure
 
 ```
 core/diagnostics/   DiagnosticClient, ConnectionState, DiagnosticError,

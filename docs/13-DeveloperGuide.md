@@ -1,6 +1,6 @@
 # 13 — Developer Guide
 
-## First session plan for Claude Code
+## First session plan
 
 1. Create Android Gradle project in `android/`.
 2. Add Kotlin, Compose, Material 3.

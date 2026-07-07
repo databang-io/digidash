@@ -18,7 +18,7 @@ The current Deep OBD setup can:
 
 Create a wrapper module around EdiabasLib/Deep OBD concepts. The wrapper exposes only the app's `DiagnosticClient` interface.
 
-Claude Code must inspect the Deep OBD/EdiabasLib API and identify:
+The developer must inspect the Deep OBD/EdiabasLib API and identify:
 
 - how to open a connection to the dongle
 - how ECU selection is configured

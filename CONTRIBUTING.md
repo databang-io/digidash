@@ -1,4 +1,4 @@
 # Contributing
 
-Start by reading `CLAUDE.md` and the ticket files. Keep changes small and testable.
+Start by reading the docs and ticket files. Keep changes small and testable.
 

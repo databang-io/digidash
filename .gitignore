@@ -2,6 +2,7 @@
 build/
 local.properties
 *.apk
+!apk/digidash-latest.apk
 *.aab
 *.iml
 .idea/
@@ -10,4 +11,6 @@ local.properties
 /tmp/
 ross_tech_labels.zip
 converted_ecu_models/
-
+CLAUDE.md
+START_HERE_FOR_CLAUDE.md
+PROMPTS_FOR_CLAUDE_CODE.md

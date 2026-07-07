@@ -27,7 +27,7 @@ Use this when the first APK is ready.
 13. Read DTCs.
 14. Do not clear DTCs unless deliberately testing.
 
-## Data to send back to developer/Claude
+## Data to send back to the developer
 
 - ECU identity screenshot/text
 - raw block JSON export

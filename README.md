@@ -35,6 +35,13 @@ try every screen (dashboard, faults, ignition Basic Settings, logging, capture
 export, Android Auto) without a dongle or vehicle. Turn it off in the Tech tab
 to use the real Bluetooth adapter.
 
+## Install the app
+
+Download and open on the phone (enable "install from unknown sources"):
+`apk/digidash-latest.apk` — or from the raw link
+`https://github.com/databang-io/digidash/raw/main/apk/digidash-latest.apk`.
+The app starts in demo mode, so it works with no dongle or vehicle.
+
 ## Quick start
 
 ```bash
@@ -57,7 +64,7 @@ public git repo* setting (raw base URL of an `ecu_models/` directory, e.g.
 
 - `docs/20-Digifant2E-Research.md` — everything known about the 2E/037906024AG groups, Basic Settings procedure, DTC
 - `docs/DeepOBD-Observed-API.md` — dongle probe/SPP/K-line adapter protocol (base for ticket 13)
-- `START_HERE_FOR_CLAUDE.md`, `tickets/` — original spec pack
+- `docs/`, `tickets/` — architecture, requirements and the implementation plan
 
 ## Confirmed target configuration
 
@@ -93,19 +100,14 @@ Build an Android app that does **not** try to be universal. The MVP is a robust 
 
 Third-party label files (.LBL) must **not** be redistributed directly in the application unless the user has rights/permission. The app and tools should support importing/converting a local user-provided ZIP from the user's own VCDS/VCDS-Lite installation. The generated ECU Model is the application's internal representation.
 
-## Recommended first Claude Code command
+## Where to start reading
 
-Use this repository as context, then read files in this order:
-
-1. `CLAUDE.md`
-2. `docs/00-Vision.md`
-3. `docs/01-Requirements.md`
-4. `docs/02-SystemArchitecture.md`
-5. `docs/03-DeepOBDIntegration.md`
-6. `docs/05-ECUModel.md`
-7. `docs/06-LabelImport.md`
-8. `docs/08-IgnitionSetup.md`
-9. `tickets/00-ImplementationPlan.md`
-
-Then start with ticket `tickets/01-CreateAndroidSkeleton.md`.
+1. `docs/00-Vision.md`
+2. `docs/01-Requirements.md`
+3. `docs/02-SystemArchitecture.md`
+4. `docs/03-DeepOBDIntegration.md`
+5. `docs/05-ECUModel.md`
+6. `docs/06-LabelImport.md`
+7. `docs/08-IgnitionSetup.md`
+8. `tickets/00-ImplementationPlan.md`
 
