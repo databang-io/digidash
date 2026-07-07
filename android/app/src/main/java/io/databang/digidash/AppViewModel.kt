@@ -83,7 +83,13 @@ data class IgnitionState(
     val noThrottleFault: Boolean = false,
     val basicSettingsSupported: Boolean = false,
     val basicSettingsActive: Boolean = false,
-)
+    /** Live RPM/advance while in Basic Settings (from the polled adjustment group). */
+    val basicRpm: Double? = null,
+    val basicAdvance: Double? = null,
+) {
+    /** True when RPM is within the 2200-2300 timing window. */
+    val rpmOnTarget: Boolean get() = basicRpm != null && basicRpm in 2200.0..2300.0
+}
 
 class AppViewModel(
     private val container: AppContainer,
@@ -544,6 +550,8 @@ class AppViewModel(
             // is validated on the vehicle (ticket 14).
             basicSettingsSupported = !container.useRealBackend,
             basicSettingsActive = basicSettingsActive,
+            basicRpm = value("rpm_g11", "rpm", "rpm_000"),
+            basicAdvance = value("ignition_advance"),
         )
     }
 

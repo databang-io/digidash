@@ -216,6 +216,38 @@ private fun ValuesCard(state: AppUiState) {
 }
 
 @Composable
+private fun RpmTargetIndicator(rpm: Double?, onTarget: Boolean) {
+    val color = if (onTarget) StatusColors.normal else StatusColors.warning
+    // 2250 target sits at 50% of a 2000-2500 bar.
+    val fraction = ((rpm ?: 2250.0) - 2000.0) / 500.0
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                rpm?.let { "${it.toInt()} rpm" } ?: "— rpm",
+                style = MaterialTheme.typography.headlineSmall,
+                color = color,
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                if (onTarget) "ON TARGET" else "target 2250 (2200–2300)",
+                style = MaterialTheme.typography.labelMedium,
+                color = color,
+            )
+        }
+        androidx.compose.material3.LinearProgressIndicator(
+            progress = { fraction.coerceIn(0.0, 1.0).toFloat() },
+            modifier = Modifier.fillMaxWidth(),
+            color = color,
+        )
+        Text(
+            "Hold the throttle so the bar sits in the middle (or the ECU may hold it for you).",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
 private fun ValueLine(
     byKey: Map<String, io.databang.digidash.domain.model.DashboardCardState>,
     label: String,
@@ -321,6 +353,17 @@ private fun BasicSettingsCard(
                     else MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.titleSmall,
                 )
+            }
+
+            if (ign.basicSettingsActive) {
+                RpmTargetIndicator(ign.basicRpm, ign.rpmOnTarget)
+                ign.basicAdvance?.let { adv ->
+                    Text(
+                        "ECU-reported advance: ${adv.toInt()}° BTDC (set with the timing light " +
+                            "on your pulley mark — target ~6°)",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
             }
             Text(
                 "In Basic Settings the ECU holds a fixed condition (~2250 rpm) so you can " +
