@@ -26,6 +26,8 @@ import io.databang.digidash.domain.model.RawMeasuringBlock
  * real contact will likely need one of these flipped.
  */
 data class Kwp1281Config(
+    /** 5-baud init line driver: "both" (K+L, default), "l", or "k". */
+    val initLine: String = "both",
     /** RX de-pairing: the adapter returns raw K-line bytes, so default OFF. */
     val depair: String = "off",
     /** Kotlin builds the full [len][counter][title][data][03] block (else title+data only). */
@@ -51,14 +53,22 @@ class Kwp1281Session(
 
     /** 5-baud init + key-byte handshake + pump identification blocks. */
     fun connect(): Result<List<String>> = runCatching {
-        val pulse = AdapterProtocol.pulseTelegram(ecuAddress, baud = baud)
-        android.util.Log.i(TAG, "kwp: TX pulse(5-baud addr=$ecuAddress baud=$baud) ${hexOf(pulse)}")
+        // KWP1281 requires ~2600 ms of K-line idle before the 5-baud wake.
+        Thread.sleep(2600)
+        val flags1 = when (config.initLine) {
+            "l" -> AdapterProtocol.PULSE_FLAGS_L
+            "k" -> AdapterProtocol.PULSE_FLAGS_K
+            else -> AdapterProtocol.PULSE_FLAGS_BOTH
+        }
+        val pulse = AdapterProtocol.pulseTelegram(ecuAddress, baud = baud, flags1 = flags1)
+        android.util.Log.i(TAG, "kwp: TX pulse(addr=$ecuAddress baud=$baud line=${config.initLine}) ${hexOf(pulse)}")
         transport.write(pulse)
 
-        // The adapter returns raw K-line bytes: 1 sync byte then 2 key bytes.
-        val init = readRaw(3000)
+        // The adapter clocks the address for ~2 s, then the ECU replies on the
+        // K-line: 1 sync byte + 2 key bytes (raw, no status pairing).
+        val init = readRaw(4000)
         android.util.Log.i(TAG, "kwp: RX init ${init.size}: ${hexOf(init)}")
-        if (init.size < 3) error("no sync/keybytes from ECU after init (ignition on?)")
+        if (init.size < 3) error("no sync/keybytes from ECU after init (ignition on? K-line?)")
         val sync = init[0].toInt() and 0xFF
         val kb2Raw = init[2].toInt() and 0xFF
         android.util.Log.i(TAG, "kwp: sync=0x%02X kb1=0x%02X kb2=0x%02X".format(

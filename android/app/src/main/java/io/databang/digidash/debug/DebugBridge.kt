@@ -137,6 +137,7 @@ class DebugBridge(
                     intent.getIntExtra("addr", -1).takeIf { it >= 0 }?.let { client.ecuAddress = it }
                     val c = client.kwpConfig
                     client.kwpConfig = c.copy(
+                        initLine = intent.getStringExtra("initline") ?: c.initLine,
                         depair = intent.getStringExtra("depair") ?: c.depair,
                         buildFullBlock = intent.getStringExtra("block")
                             ?.let { it == "full" } ?: c.buildFullBlock,

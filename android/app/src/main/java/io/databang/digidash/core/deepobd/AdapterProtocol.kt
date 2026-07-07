@@ -85,9 +85,16 @@ object AdapterProtocol {
      * KWP address as start bit + 8 data bits + stop bit; the firmware clocks it
      * out at [pulseWidthMs] per bit.
      */
+    /** Pulse line-driver flags: both K+L (default, for K-line ECUs like the 2E),
+     *  L-line only, or K-line-only (no explicit line bit, DTR-driven). */
+    const val PULSE_FLAGS_BOTH = 0x10 or 0x20 or 0x08 or 0x80 // SEND_PULSE|NO_ECHO|USE_LLINE|USE_KLINE = 0xB8
+    const val PULSE_FLAGS_L = 0x10 or 0x20 or 0x08            // 0x38
+    const val PULSE_FLAGS_K = 0x10 or 0x20                    // 0x30
+
     fun pulseTelegram(
         address: Int,
         baud: Int = 9600,
+        flags1: Int = PULSE_FLAGS_BOTH,
         pulseWidthMs: Int = 200,
         autoKeyByteDelayMs: Int = 10,
     ): ByteArray {
@@ -97,8 +104,6 @@ object AdapterProtocol {
         val bitCount = 10
         // pulse-specific length counts pulseWidth + bitCount + dataBytes = 1+1+2 = 5.
         val payloadLen = 5
-        // Pulse uses setDtr=false → USE_LLINE set. flags = SEND_PULSE|NO_ECHO|USE_LLINE.
-        val flags1 = KLINEF1_SEND_PULSE or KLINEF1_NO_ECHO or KLINEF1_USE_LLINE
         val flags2 = KLINEF2_KWP1281_DETECT
         val half = if (baud == 115200) 0 else baud / 2
         val header = byteArrayOf(
