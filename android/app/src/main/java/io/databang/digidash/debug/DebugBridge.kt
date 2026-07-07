@@ -66,6 +66,12 @@ class DebugBridge(
                         list.joinToString("; ") { "${it.code}/${it.statusRaw}" }.ifEmpty { "none" }
                     }.getOrElse { "ERR ${it.asDiagnosticError().userMessage()}" })
                 }
+                "cleardtc" -> {
+                    // Real ECU write — only via an explicit operator command.
+                    val r = client.clearDtc()
+                    Log.i(TAG, "cleardtc -> " +
+                        r.map { "OK (cleared)" }.getOrElse { "ERR ${it.asDiagnosticError().userMessage()}" })
+                }
                 "raw" -> {
                     val hex = intent.getStringExtra("hex").orEmpty()
                     val bytes = parseHex(hex)
