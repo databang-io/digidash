@@ -26,8 +26,8 @@ import io.databang.digidash.domain.model.RawMeasuringBlock
  * real contact will likely need one of these flipped.
  */
 data class Kwp1281Config(
-    /** RX de-pairing: AUTO heuristic, or force ON/OFF. */
-    val depair: String = "auto",
+    /** RX de-pairing: the adapter returns raw K-line bytes, so default OFF. */
+    val depair: String = "off",
     /** Kotlin builds the full [len][counter][title][data][03] block (else title+data only). */
     val buildFullBlock: Boolean = true,
     /** Send ACK (0x09) blocks ourselves (off if the firmware auto-acks). */
@@ -49,14 +49,30 @@ class Kwp1281Session(
 
     data class Block(val counter: Int, val title: Int, val data: ByteArray)
 
-    /** 5-baud init + pump identification blocks. Returns the ECU ID ASCII lines. */
+    /** 5-baud init + key-byte handshake + pump identification blocks. */
     fun connect(): Result<List<String>> = runCatching {
-        transport.write(AdapterProtocol.pulseTelegram(ecuAddress))
-        val sync = readRaw(blockTimeoutMs)
-        if (sync.isEmpty()) error("no sync/keybytes from ECU after init")
+        val pulse = AdapterProtocol.pulseTelegram(ecuAddress, baud = baud)
+        android.util.Log.i(TAG, "kwp: TX pulse(5-baud addr=$ecuAddress baud=$baud) ${hexOf(pulse)}")
+        transport.write(pulse)
 
-        // Pump ID blocks: read a block, ACK it, until the ECU sends an ACK block
-        // (title 0x09) meaning it is ready for a command.
+        // The adapter returns raw K-line bytes: 1 sync byte then 2 key bytes.
+        val init = readRaw(3000)
+        android.util.Log.i(TAG, "kwp: RX init ${init.size}: ${hexOf(init)}")
+        if (init.size < 3) error("no sync/keybytes from ECU after init (ignition on?)")
+        val sync = init[0].toInt() and 0xFF
+        val kb2Raw = init[2].toInt() and 0xFF
+        android.util.Log.i(TAG, "kwp: sync=0x%02X kb1=0x%02X kb2=0x%02X".format(
+            sync, init[1].toInt() and 0xFF, kb2Raw))
+
+        // Key-byte handshake: after 40 ms, send the complement of key byte 2.
+        // This is what actually starts the KWP1281 session.
+        Thread.sleep(40)
+        val complement = kb2Raw.inv() and 0xFF
+        counter = 0
+        android.util.Log.i(TAG, "kwp: TX ~KB2 = 0x%02X".format(complement))
+        transport.write(AdapterProtocol.kLineTelegram(baud, byteArrayOf(complement.toByte())))
+
+        // Pump ID blocks: read a block, ACK it, until the ECU sends an ACK block.
         idBlocks.clear()
         var guard = 0
         while (guard++ < 32) {
@@ -144,8 +160,12 @@ class Kwp1281Session(
         transport.write(AdapterProtocol.kLineTelegram(baud = baud, payload = payload))
     }
 
+    private val TAG = "DIGIDASH_DBG"
+    private fun hexOf(b: ByteArray) = b.joinToString(" ") { "%02X".format(it.toInt() and 0xFF) }
+
     private fun readBlock(): Block? {
         val raw = readRaw(blockTimeoutMs)
+        android.util.Log.i(TAG, "kwp: RX block ${raw.size}: ${hexOf(raw)}")
         if (raw.isEmpty()) return null
         val bytes = depair(raw)
         if (bytes.size < 4) return null

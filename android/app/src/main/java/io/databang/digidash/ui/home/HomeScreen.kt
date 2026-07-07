@@ -104,9 +104,11 @@ private fun ConnectionCard(
                 AssistChip(onClick = {}, label = { Text(label) })
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "Fake ECU backend (no vehicle needed)",
+                    text = if (state.useRealBackend) "Real dongle (Deep OBD adapter)"
+                    else "Demo mode (no vehicle needed)",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (state.useRealBackend) StatusColors.warning
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (state.connecting) {
                     Spacer(Modifier.width(8.dp))

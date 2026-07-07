@@ -22,17 +22,13 @@ private class ScriptTransport(private val reads: ArrayDeque<ByteArray>) : SppTra
 
 class Kwp1281SessionTest {
 
-    /** Build a de-paired-looking RX: each data byte followed by a 0-status byte. */
-    private fun paired(vararg data: Int): ByteArray {
-        val out = ArrayList<Byte>()
-        for (d in data) { out.add(d.toByte()); out.add(0) }
-        return out.toByteArray()
-    }
+    /** The adapter returns raw K-line bytes (no data/status pairing). */
+    private fun raw(vararg data: Int): ByteArray = data.map { it.toByte() }.toByteArray()
 
     @Test
     fun `group read sends a group-request block and decodes the response`() {
         // Response block: [len][counter][title E7][type a b][03]
-        val resp = paired(0x06, 0x02, Kwp1281Protocol.TITLE_GROUP_RESPONSE, 0x01, 100, 46, 0x03)
+        val resp = raw(0x06, 0x02, Kwp1281Protocol.TITLE_GROUP_RESPONSE, 0x01, 100, 46, 0x03)
         val transport = ScriptTransport(ArrayDeque(listOf(resp)))
         val session = Kwp1281Session(transport, blockTimeoutMs = 10)
 
@@ -47,8 +43,8 @@ class Kwp1281SessionTest {
     @Test
     fun `dtc read decodes fault codes from response block`() {
         // [len][counter][FC][hi lo status ...][03]; 00515 = 0x0203
-        val resp = paired(0x06, 0x02, Kwp1281Protocol.TITLE_DTC_RESPONSE, 0x02, 0x03, 0x24, 0x03)
-        val ack = paired(0x03, 0x03, Kwp1281Protocol.TITLE_ACK, 0x03)
+        val resp = raw(0x06, 0x02, Kwp1281Protocol.TITLE_DTC_RESPONSE, 0x02, 0x03, 0x24, 0x03)
+        val ack = raw(0x03, 0x03, Kwp1281Protocol.TITLE_ACK, 0x03)
         val transport = ScriptTransport(ArrayDeque(listOf(resp, ack)))
         val session = Kwp1281Session(transport, blockTimeoutMs = 10)
 

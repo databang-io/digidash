@@ -75,6 +75,13 @@ class DeepObdDiagnosticClient(
             return@withContext diagnosticFailure<Unit>(DiagnosticError.EcuNoResponse)
         }
 
+        // Drain any residual probe bytes (voltage/version replies) so they are
+        // not misread as the KWP1281 init response.
+        runCatching {
+            var drained = 0
+            while (t.read(256, 120).isNotEmpty() && drained < 8) drained++
+        }
+
         // Live KWP1281 init: 5-baud wake (firmware) + pump the ECU ID blocks.
         val s = Kwp1281Session(t, baud = kwpBaud, ecuAddress = ecuAddress, config = kwpConfig)
         val idResult = s.connect()

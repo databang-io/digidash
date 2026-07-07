@@ -31,6 +31,7 @@ class AndroidSppTransport(
         adapter.cancelDiscovery()
         val uuid = UUID.fromString(SPP_UUID)
         val bonded = device.bondState == BluetoothDevice.BOND_BONDED
+        android.util.Log.i(TAG, "spp: connect $address bonded=$bonded")
         val s = if (bonded) {
             device.createRfcommSocketToServiceRecord(uuid)
         } else {
@@ -38,11 +39,15 @@ class AndroidSppTransport(
         }
         try {
             s.connect()
+            android.util.Log.i(TAG, "spp: connected (1st)")
         } catch (first: Exception) {
+            android.util.Log.i(TAG, "spp: 1st connect failed: ${first.message}; retrying")
             // "sometimes the second connect works" — Deep OBD retries once.
             try {
                 s.connect()
+                android.util.Log.i(TAG, "spp: connected (2nd)")
             } catch (second: Exception) {
+                android.util.Log.w(TAG, "spp: 2nd connect failed: ${second.message}")
                 runCatching { s.close() }
                 throw second
             }
@@ -51,6 +56,8 @@ class AndroidSppTransport(
         input = s.inputStream
         output = s.outputStream
     }
+
+    private companion object { const val TAG = "DIGIDASH_DBG" }
 
     override fun write(data: ByteArray) {
         val out = output ?: error("not connected")

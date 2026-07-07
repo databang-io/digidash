@@ -62,17 +62,13 @@ object AdapterProtocol {
     fun kLineTelegram(
         baud: Int,
         payload: ByteArray,
-        parity: Int = KLINEF1_PARITY_NONE,
-        useKLine: Boolean = true,
-        fastInit: Boolean = false,
         kwp1281: Boolean = true,
         interByteTime: Int = 0,
     ): ByteArray {
-        val flags1 = parity or KLINEF1_NO_ECHO or
-            (if (useKLine) KLINEF1_USE_KLINE else 0) or
-            (if (fastInit) KLINEF1_FAST_INIT else 0)
+        // KWP1281 data telegram uses setDtr=true → USE_LLINE NOT set → flags1 = NO_ECHO.
+        val flags1 = KLINEF1_NO_ECHO
         val flags2 = if (kwp1281) KLINEF2_KWP1281_DETECT else 0
-        val half = baud / 2
+        val half = if (baud == 115200) 0 else baud / 2
         val len = payload.size
         val header = byteArrayOf(
             0x00, 0x02,
@@ -89,20 +85,34 @@ object AdapterProtocol {
      * KWP address as start bit + 8 data bits + stop bit; the firmware clocks it
      * out at [pulseWidthMs] per bit.
      */
-    fun pulseTelegram(address: Int, pulseWidthMs: Int = 200, autoKeyByteDelayMs: Int = 0): ByteArray {
+    fun pulseTelegram(
+        address: Int,
+        baud: Int = 9600,
+        pulseWidthMs: Int = 200,
+        autoKeyByteDelayMs: Int = 10,
+    ): ByteArray {
+        // 10-bit slow-init frame: start bit (0) + 8 data bits (address, LSB first)
+        // + stop bit (1). Packed LSB-first: (addr << 1) | 0x0200 = 2 bytes.
         val dataBits = ((address shl 1) or 0x0200) and 0x03FF
-        val length = 10
+        val bitCount = 10
+        // pulse-specific length counts pulseWidth + bitCount + dataBytes = 1+1+2 = 5.
+        val payloadLen = 5
+        // Pulse uses setDtr=false → USE_LLINE set. flags = SEND_PULSE|NO_ECHO|USE_LLINE.
+        val flags1 = KLINEF1_SEND_PULSE or KLINEF1_NO_ECHO or KLINEF1_USE_LLINE
+        val flags2 = KLINEF2_KWP1281_DETECT
+        val half = if (baud == 115200) 0 else baud / 2
         val header = byteArrayOf(
             0x00, 0x02,
-            0x00, 0x00,
-            (KLINEF1_SEND_PULSE or KLINEF1_USE_KLINE or KLINEF1_NO_ECHO).toByte(), 0x00,
+            ((half shr 8) and 0xFF).toByte(), (half and 0xFF).toByte(),
+            flags1.toByte(), flags2.toByte(),
             0x00, KWP1281_TIMEOUT.toByte(),
-            0x00, 0x03,
+            ((payloadLen shr 8) and 0xFF).toByte(), (payloadLen and 0xFF).toByte(),
         )
         val pulse = byteArrayOf(
             pulseWidthMs.toByte(),
-            length.toByte(),
+            bitCount.toByte(),
             (dataBits and 0xFF).toByte(),
+            ((dataBits shr 8) and 0xFF).toByte(),
             autoKeyByteDelayMs.toByte(),
         )
         return withChecksum(header + pulse)
