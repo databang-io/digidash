@@ -39,6 +39,7 @@ data class AppUiState(
     val recording: Boolean = false,
     val currentLogFile: String? = null,
     val logs: List<LogFile> = emptyList(),
+    val importedReplay: io.databang.digidash.core.logging.ReplayData? = null,
     val availableGroups: List<Int> = emptyList(),
     val scenario: FakeScenario = FakeScenario.NORMAL,
     val dongles: List<DongleDevice> = emptyList(),
@@ -247,6 +248,12 @@ class AppViewModel(
 
     fun parseLog(path: String): io.databang.digidash.core.logging.ReplayData =
         io.databang.digidash.core.logging.LogReplay.parse(java.io.File(path))
+
+    /** Import an external CSV (e.g. VCDS-Lite LOG output) for graphing. */
+    fun importCsv(text: String) {
+        val data = io.databang.digidash.core.logging.GenericCsvLog.parse(text)
+        _ui.update { it.copy(importedReplay = data) }
+    }
 
     fun cardFor(key: String) = _ui.value.cards.find { it.key == key }
     fun peakFor(key: String) = _ui.value.peaks[key]

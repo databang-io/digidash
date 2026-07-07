@@ -1,6 +1,8 @@
 package io.databang.digidash.ui.logs
 
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +27,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -51,10 +54,22 @@ fun LogsScreen(
     onRefresh: () -> Unit,
     onDelete: (LogFile) -> Unit,
     onOpenGraph: (LogFile) -> Unit = {},
+    onImportCsv: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     var pendingDelete by remember { mutableStateOf<LogFile?>(null) }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            val text = runCatching {
+                context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+            }.getOrNull()
+            if (text != null) onImportCsv(text)
+        }
+    }
 
     Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
         Text("Logs", style = MaterialTheme.typography.titleLarge)
@@ -92,6 +107,16 @@ fun LogsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+
+        Spacer(Modifier.height(12.dp))
+        OutlinedButton(
+            onClick = { importLauncher.launch(arrayOf("text/*", "text/csv", "text/comma-separated-values", "*/*")) },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(Icons.AutoMirrored.Filled.ShowChart, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("Import CSV (VCDS-Lite log) → graph")
         }
 
         Spacer(Modifier.height(16.dp))

@@ -136,6 +136,14 @@ fun DigiDashApp(container: AppContainer, sessionHolder: SessionHolder) {
                 }
                 ReplayScreen(fileName = name, data = data, onBack = { navController.popBackStack() })
             }
+            composable("imported") {
+                ReplayScreen(
+                    fileName = "Imported CSV",
+                    data = state.importedReplay
+                        ?: io.databang.digidash.core.logging.ReplayData(emptyList(), emptyMap(), emptyMap()),
+                    onBack = { navController.popBackStack() },
+                )
+            }
             composable(Destination.DTC.route) {
                 DtcScreen(
                     state = state,
@@ -160,6 +168,10 @@ fun DigiDashApp(container: AppContainer, sessionHolder: SessionHolder) {
                     onRefresh = viewModel::refreshLogs,
                     onDelete = viewModel::deleteLog,
                     onOpenGraph = { log -> navController.navigate("replay/${log.name}") },
+                    onImportCsv = { text ->
+                        viewModel.importCsv(text)
+                        navController.navigate("imported")
+                    },
                 )
             }
             composable(Destination.TECH.route) {
