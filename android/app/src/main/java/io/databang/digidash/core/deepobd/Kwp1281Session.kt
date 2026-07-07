@@ -30,8 +30,9 @@ data class Kwp1281Config(
     val autoBaud: Boolean = true,
     /** 5-baud init line driver: "both" (K+L, default), "l", or "k". */
     val initLine: String = "both",
-    /** RX de-pairing: the adapter returns raw K-line bytes, so default OFF. */
-    val depair: String = "off",
+    /** Block-data bytes arrive paired (data + 0x02 status) — de-pair by default.
+     *  The init baud/key-byte reads are raw and bypass this. */
+    val depair: String = "on",
     /** Kotlin builds the full [len][counter][title][data][03] block (else title+data only). */
     val buildFullBlock: Boolean = true,
     /** Send ACK (0x09) blocks ourselves (off if the firmware auto-acks). */
