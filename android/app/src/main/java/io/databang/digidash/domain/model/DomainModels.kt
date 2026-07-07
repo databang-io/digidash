@@ -5,6 +5,8 @@ data class EcuIdentity(
     val partNumberRaw: String,
     val partNumberNormalized: String,
     val component: String,
+    /** Software version / coding reported in the component block (e.g. "1576"). */
+    val softwareVersion: String? = null,
     val serialNumber: String? = null,
     val protocol: String? = null,
     /** VIN if the ECU reports one. Old KWP1281 Digifant ECUs usually do not. */
@@ -18,6 +20,7 @@ data class EcuIdentity(
         fun fromRaw(
             partNumberRaw: String,
             component: String,
+            softwareVersion: String? = null,
             serialNumber: String? = null,
             protocol: String? = null,
             vin: String? = null,
@@ -25,6 +28,7 @@ data class EcuIdentity(
             partNumberRaw = partNumberRaw,
             partNumberNormalized = normalizePartNumber(partNumberRaw),
             component = component,
+            softwareVersion = softwareVersion,
             serialNumber = serialNumber,
             protocol = protocol,
             vin = vin,

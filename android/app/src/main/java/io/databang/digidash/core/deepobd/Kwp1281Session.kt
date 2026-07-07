@@ -47,6 +47,8 @@ class Kwp1281Session(
     private val config: Kwp1281Config = Kwp1281Config(),
 ) {
     private var counter = 0
+    /** Baud actually used on the wire: the auto-detected rate once init runs. */
+    private var activeBaud = baud
     private val idBlocks = mutableListOf<String>()
 
     /** ID ASCII blocks captured during connect (for the debug 'id' command). */
@@ -79,6 +81,9 @@ class Kwp1281Session(
             val detected = (((baudBytes[0].toInt() and 0xFF) shl 8) or (baudBytes[1].toInt() and 0xFF)) shl 1
             android.util.Log.i(TAG, "kwp: detected baud = $detected")
             if (detected == 0) error("invalid baud detected")
+            // All subsequent telegrams must be transmitted at the ECU's rate,
+            // not the initial guess — otherwise the ECU never sees our ACKs.
+            activeBaud = detected
             val kb = readExact(2, 1500)
             android.util.Log.i(TAG, "kwp: RX keybytes ${hexOf(kb)}")
             // Firmware sends the ~KB2 complement itself; host does nothing here.
@@ -235,7 +240,16 @@ class Kwp1281Session(
             // Firmware frames the block; we send just the title + data.
             byteArrayOf(title.toByte(), *data)
         }
-        transport.write(AdapterProtocol.kLineTelegram(baud = baud, payload = payload))
+        android.util.Log.i(TAG, "kwp: TX block ${hexOf(payload)}")
+        transport.write(AdapterProtocol.kLineTelegram(baud = activeBaud, payload = payload))
+        // The ECU complement-acks every transmitted byte except the last 0x03,
+        // and the firmware relays those single (unpaired) bytes back to us. Drain
+        // them, or the odd count shifts the (data,status) pairing of the next
+        // block and we read status bytes as data.
+        if (config.depair == "on" && payload.size > 1) {
+            val echo = readExact(payload.size - 1, 300)
+            android.util.Log.i(TAG, "kwp: drained ack echo ${hexOf(echo)}")
+        }
     }
 
     private val TAG = "DIGIDASH_DBG"
@@ -251,11 +265,21 @@ class Kwp1281Session(
      */
     private fun readBlock(): Block? {
         val unit = if (config.depair == "on") 2 else 1
-        val head = readExact(unit, blockTimeoutMs)
-        if (head.size < unit) return null
-        val len = head[0].toInt() and 0xFF
-        if (len < 3 || len > 64) {
-            android.util.Log.i(TAG, "kwp: RX block bad len=$len ${hexOf(head)}")
+        // Sync to a plausible length byte: after we transmit a block the ECU
+        // echoes the per-byte complement of our bytes (small block bytes → high
+        // complements ≥ 0x80), which the firmware relays to us. Skip those and
+        // any stray bytes until we see a valid KWP1281 length (3..64).
+        var len = -1
+        var scan = 0
+        while (scan++ < 40) {
+            val head = readExact(unit, blockTimeoutMs)
+            if (head.size < unit) return null
+            val v = head[0].toInt() and 0xFF
+            if (v in 3..64) { len = v; break }
+            android.util.Log.i(TAG, "kwp: RX skip ${hexOf(head)}")
+        }
+        if (len < 0) {
+            android.util.Log.i(TAG, "kwp: RX no valid block length")
             return null
         }
         // Remaining logical bytes: counter, title, payload..., 0x03.

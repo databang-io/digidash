@@ -183,10 +183,22 @@ class DeepObdDiagnosticClient(
         val joined = idBlocks.joinToString(" ")
         val partToken = Regex("\\b\\d{3}[\\s-]?\\d{3}[\\s-]?\\d{3}[\\s-]?[A-Z]{0,2}\\b")
             .find(joined)?.value
-        val component = idBlocks.maxByOrNull { it.length }?.take(40) ?: "ECU"
+        val partNorm = partToken?.let { EcuIdentity.normalizePartNumber(it) }
+        // The component block is the one with letters that is not the part number
+        // (e.g. "DIGIFANT 1.7      1576"). Collapse the padding whitespace.
+        val compBlock = idBlocks.firstOrNull { blk ->
+            blk.any { it.isLetter() } && EcuIdentity.normalizePartNumber(blk) != partNorm
+        } ?: idBlocks.maxByOrNull { it.length }
+        // "DIGIFANT 1.7      1576" -> component "DIGIFANT 1.7" + version "1576".
+        val cleaned = compBlock?.replace(Regex("\\s+"), " ")?.trim()
+        val softwareVersion = cleaned?.let { Regex("(\\d{3,})$").find(it)?.groupValues?.get(1) }
+        val component = cleaned
+            ?.let { c -> softwareVersion?.let { c.removeSuffix(it).trim() } ?: c }
+            ?.take(40) ?: "ECU"
         return EcuIdentity.fromRaw(
             partNumberRaw = partToken ?: "unknown",
             component = component,
+            softwareVersion = softwareVersion,
             protocol = "KWP1281",
         )
     }

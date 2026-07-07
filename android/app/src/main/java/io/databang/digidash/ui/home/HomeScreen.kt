@@ -150,6 +150,9 @@ private fun EcuCard(state: AppUiState) {
             } else {
                 Text(identity.partNumberRaw, style = MaterialTheme.typography.titleLarge)
                 Text(identity.component, style = MaterialTheme.typography.bodyMedium)
+                identity.softwareVersion?.let {
+                    Text("Software version: $it", style = MaterialTheme.typography.bodySmall)
+                }
                 identity.protocol?.let {
                     Text("Protocol: $it", style = MaterialTheme.typography.bodySmall)
                 }
