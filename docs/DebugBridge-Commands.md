@@ -29,6 +29,10 @@ adb shell am broadcast -a io.databang.digidash.DEBUG --es cmd poll --ei n 0 --ei
 # read DTCs
 adb shell am broadcast -a io.databang.digidash.DEBUG --es cmd dtc
 
+# Basic Settings (ignition timing). read-only safe mode must be OFF.
+adb shell am broadcast -a io.databang.digidash.DEBUG --es cmd basic --ei n 0
+adb shell am broadcast -a io.databang.digidash.DEBUG --es cmd basicexit
+
 # send arbitrary bytes to the adapter and log the response (framing probing)
 adb shell am broadcast -a io.databang.digidash.DEBUG --es cmd raw --es hex "82 F1 F1 FE FE 60"
 

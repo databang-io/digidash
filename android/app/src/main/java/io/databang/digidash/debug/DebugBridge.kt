@@ -97,6 +97,17 @@ class DebugBridge(
                         kotlinx.coroutines.delay(interval)
                     }
                 }
+                "basic" -> {
+                    val n = intent.getIntExtra("n", 0)
+                    val r = client.enterBasicSettings(n)
+                    Log.i(TAG, "enterBasicSettings $n -> " +
+                        r.map { "OK" }.getOrElse { "ERR ${it.asDiagnosticError().userMessage()}" })
+                }
+                "basicexit" -> {
+                    val r = client.exitBasicSettings()
+                    Log.i(TAG, "exitBasicSettings -> " +
+                        r.map { "OK" }.getOrElse { "ERR ${it.asDiagnosticError().userMessage()}" })
+                }
                 "voltage" -> Log.i(TAG, "voltage -> ${client.debugVoltage()} V")
                 "id" -> Log.i(TAG, "id blocks -> ${client.debugIdBlocks()}")
                 "adapter" -> Log.i(TAG, "adapter -> ${client.adapterInfo()}")
