@@ -94,6 +94,7 @@ object Kwp1281Protocol {
                 RawDtc(
                     code = codeNum.toString().padStart(5, '0'),
                     statusRaw = "%02d-%02d".format(status shr 4, status and 0x0F),
+                    statusByte = status,
                 )
             )
             i += 3

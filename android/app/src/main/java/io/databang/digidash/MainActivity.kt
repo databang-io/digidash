@@ -60,6 +60,18 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private fun shareTextFile(context: android.content.Context, path: String) {
+    val uri = androidx.core.content.FileProvider.getUriForFile(
+        context, "${context.packageName}.fileprovider", java.io.File(path),
+    )
+    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(android.content.Intent.createChooser(intent, "Share capture"))
+}
+
 private enum class Destination(
     val route: String,
     val label: String,
@@ -144,6 +156,17 @@ fun DigiDashApp(container: AppContainer, sessionHolder: SessionHolder) {
                     onBack = { navController.popBackStack() },
                 )
             }
+            composable("capture-wizard") {
+                val ctx = androidx.compose.ui.platform.LocalContext.current
+                io.databang.digidash.ui.capture.CaptureWizardScreen(
+                    state = state,
+                    onCapture = viewModel::captureStep,
+                    onClear = viewModel::clearCaptures,
+                    onExport = viewModel::exportCaptures,
+                    onShareFile = { path -> shareTextFile(ctx, path) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
             composable(Destination.DTC.route) {
                 DtcScreen(
                     state = state,
@@ -186,6 +209,7 @@ fun DigiDashApp(container: AppContainer, sessionHolder: SessionHolder) {
                     onResetPeaks = viewModel::resetPeaks,
                     onToggleCaptureRaw = viewModel::setCaptureRawTraffic,
                     onToggleReadOnly = viewModel::setReadOnlyMode,
+                    onOpenCaptureWizard = { navController.navigate("capture-wizard") },
                 )
             }
         }

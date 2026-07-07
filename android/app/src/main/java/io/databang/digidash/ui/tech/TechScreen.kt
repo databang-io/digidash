@@ -51,6 +51,7 @@ fun TechScreen(
     onResetPeaks: () -> Unit,
     onToggleCaptureRaw: (Boolean) -> Unit,
     onToggleReadOnly: (Boolean) -> Unit,
+    onOpenCaptureWizard: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -59,6 +60,14 @@ fun TechScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item { BackendCard(state, onToggleRealBackend) }
+        if (state.connected) {
+            item {
+                androidx.compose.material3.OutlinedButton(
+                    onClick = onOpenCaptureWizard,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Guided group-000 capture (identify the layout)") }
+            }
+        }
         if (state.useRealBackend) {
             item { LiveSessionCard(state, onToggleCaptureRaw, onToggleReadOnly) }
         }

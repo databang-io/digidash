@@ -40,6 +40,7 @@ data class AppUiState(
     val currentLogFile: String? = null,
     val logs: List<LogFile> = emptyList(),
     val importedReplay: io.databang.digidash.core.logging.ReplayData? = null,
+    val captureSnapshots: List<CaptureSnapshot> = emptyList(),
     val availableGroups: List<Int> = emptyList(),
     val scenario: FakeScenario = FakeScenario.NORMAL,
     val dongles: List<DongleDevice> = emptyList(),
@@ -63,6 +64,13 @@ data class TechGroup(
     val group: Int,
     val label: String,
     val measurements: List<InterpretedMeasurement>,
+)
+
+/** One labelled group-000 raw snapshot from the guided capture wizard. */
+data class CaptureSnapshot(
+    val label: String,
+    val timeMillis: Long,
+    val rawValues: List<String>,
 )
 
 /** Automatic checklist items for the ignition assistant, derived from ECU data. */
@@ -253,6 +261,38 @@ class AppViewModel(
     fun importCsv(text: String) {
         val data = io.databang.digidash.core.logging.GenericCsvLog.parse(text)
         _ui.update { it.copy(importedReplay = data) }
+    }
+
+    // --- Guided group-000 capture wizard ---
+
+    /** Read group 000 once and store its 10 raw values under [label]. */
+    fun captureStep(label: String) {
+        viewModelScope.launch {
+            session.readGroupOnce(0)
+            val raw = session.measurements.value.values
+                .filter { it.group == 0 }
+                .sortedBy { it.fieldIndex }
+                .map { it.rawString ?: "?" }
+            val snap = CaptureSnapshot(label, System.currentTimeMillis(), raw)
+            _ui.update { it.copy(captureSnapshots = it.captureSnapshots + snap) }
+        }
+    }
+
+    fun clearCaptures() = _ui.update { it.copy(captureSnapshots = emptyList()) }
+
+    /** Write the captured snapshots to a shareable text file. */
+    fun exportCaptures(onReady: (String) -> Unit) {
+        val snaps = _ui.value.captureSnapshots
+        if (snaps.isEmpty()) return
+        val sb = StringBuilder()
+        sb.appendLine("DigiDash group-000 guided capture")
+        sb.appendLine("ecu=${session.identity.value?.partNumberRaw ?: "unknown"}")
+        sb.appendLine("field:  1  2  3  4  5  6  7  8  9  10")
+        snaps.forEach { s ->
+            sb.appendLine("${s.label}: ${s.rawValues.joinToString("  ")}")
+        }
+        val file = container.logRepository.writeText("capture_g000_${compactTimestamp()}.txt", sb.toString())
+        onReady(file.absolutePath)
     }
 
     fun cardFor(key: String) = _ui.value.cards.find { it.key == key }

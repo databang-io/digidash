@@ -44,6 +44,10 @@ class LogRepository(private val context: Context) {
         return file
     }
 
+    /** Write an arbitrary text file into the logs dir and return it. */
+    fun writeText(name: String, content: String): File =
+        File(dir, name).apply { writeText(content) }
+
     /** A fresh raw-traffic capture file (hex dump of adapter bytes). */
     fun newRawCaptureFile(): File {
         val stamp = System.currentTimeMillis()

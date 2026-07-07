@@ -53,6 +53,8 @@ data class RawDtc(
     val code: String,
     val statusRaw: String? = null,
     val description: String? = null,
+    /** Raw KWP1281 fault status byte, when available. */
+    val statusByte: Int? = null,
 )
 
 enum class DtcSeverity { INFO, WARNING, CRITICAL }
@@ -64,8 +66,15 @@ data class InterpretedDtc(
     val statusRaw: String?,
     val severity: DtcSeverity,
     val raw: RawDtc,
+    /** True when the fault is intermittent (not currently present). */
+    val sporadic: Boolean = false,
+    /** Best-effort fault nature (open circuit, short, implausible…), if decodable. */
+    val elaboration: String? = null,
 ) {
     val hasDescription: Boolean get() = !title.isNullOrBlank()
+
+    /** "Sporadic" / "Present" label for the UI. */
+    val presenceLabel: String get() = if (sporadic) "Sporadic (intermittent)" else "Present"
 }
 
 enum class MeasurementStatus { NORMAL, WARNING, CRITICAL, UNKNOWN, UNAVAILABLE }

@@ -137,9 +137,10 @@ class FakeDiagnosticClient(
         if (scenario == FakeScenario.WITH_DTCS && !dtcsCleared) {
             return Result.success(
                 listOf(
-                    RawDtc(code = "00515", statusRaw = "27-10", description = null),
-                    RawDtc(code = "00522", statusRaw = "35-00", description = null),
-                    RawDtc(code = "01247", statusRaw = "00-00", description = null),
+                    // 0x90 = sporadic + open circuit; 0x12 = short to plus (present).
+                    RawDtc(code = "00515", statusRaw = "27-10", statusByte = 0x90),
+                    RawDtc(code = "00522", statusRaw = "35-00", statusByte = 0x12),
+                    RawDtc(code = "01247", statusRaw = "00-00", statusByte = 0x00),
                 )
             )
         }

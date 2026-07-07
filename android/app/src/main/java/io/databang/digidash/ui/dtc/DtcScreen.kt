@@ -154,6 +154,14 @@ private fun DtcRow(dtc: InterpretedDtc) {
                     text = dtc.title ?: "Unknown code (no catalog entry)",
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                Text(
+                    text = buildString {
+                        append(dtc.presenceLabel)
+                        dtc.elaboration?.let { append(" · ").append(it) }
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (dtc.sporadic) MaterialTheme.colorScheme.onSurfaceVariant else color,
+                )
                 dtc.statusRaw?.let {
                     Text(
                         "status $it",
