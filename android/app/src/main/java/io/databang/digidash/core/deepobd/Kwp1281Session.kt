@@ -20,14 +20,32 @@ import io.databang.digidash.domain.model.RawMeasuringBlock
  * is visible through [LoggingSppTransport], so mismatches are debuggable from a
  * capture. Methods return typed failures and never throw into the client.
  */
+/**
+ * Runtime-tunable framing knobs so the KWP1281 wire behaviour can be adjusted
+ * live at the vehicle (via the debug bridge) without rebuilding — the first
+ * real contact will likely need one of these flipped.
+ */
+data class Kwp1281Config(
+    /** RX de-pairing: AUTO heuristic, or force ON/OFF. */
+    val depair: String = "auto",
+    /** Kotlin builds the full [len][counter][title][data][03] block (else title+data only). */
+    val buildFullBlock: Boolean = true,
+    /** Send ACK (0x09) blocks ourselves (off if the firmware auto-acks). */
+    val sendAcks: Boolean = true,
+)
+
 class Kwp1281Session(
     private val transport: SppTransport,
     private val baud: Int = 9600,
     private val ecuAddress: Int = 0x01,
     private val blockTimeoutMs: Long = 1500,
+    private val config: Kwp1281Config = Kwp1281Config(),
 ) {
     private var counter = 0
     private val idBlocks = mutableListOf<String>()
+
+    /** ID ASCII blocks captured during connect (for the debug 'id' command). */
+    fun identificationBlocks(): List<String> = idBlocks.toList()
 
     data class Block(val counter: Int, val title: Int, val data: ByteArray)
 
@@ -105,18 +123,25 @@ class Kwp1281Session(
         sendBlock(Kwp1281Protocol.TITLE_END_OUTPUT, ByteArray(0))
     }
 
-    private fun sendAck() = sendBlock(Kwp1281Protocol.TITLE_ACK, ByteArray(0))
+    private fun sendAck() {
+        if (config.sendAcks) sendBlock(Kwp1281Protocol.TITLE_ACK, ByteArray(0))
+    }
 
     private fun sendBlock(title: Int, data: ByteArray) {
-        counter = (counter + 1) and 0xFF
-        val len = data.size + 3 // counter + title + data + end
-        val block = ByteArray(data.size + 4)
-        block[0] = len.toByte()
-        block[1] = counter.toByte()
-        block[2] = title.toByte()
-        data.copyInto(block, 3)
-        block[block.size - 1] = 0x03
-        transport.write(AdapterProtocol.kLineTelegram(baud = baud, payload = block))
+        val payload = if (config.buildFullBlock) {
+            counter = (counter + 1) and 0xFF
+            ByteArray(data.size + 4).also {
+                it[0] = (data.size + 3).toByte() // len: counter+title+data+end
+                it[1] = counter.toByte()
+                it[2] = title.toByte()
+                data.copyInto(it, 3)
+                it[it.size - 1] = 0x03
+            }
+        } else {
+            // Firmware frames the block; we send just the title + data.
+            byteArrayOf(title.toByte(), *data)
+        }
+        transport.write(AdapterProtocol.kLineTelegram(baud = baud, payload = payload))
     }
 
     private fun readBlock(): Block? {
@@ -138,11 +163,12 @@ class Kwp1281Session(
      * De-pair adapter auto-mode RX: bytes arrive as (data, status) pairs. If the
      * stream length is odd (or already de-paired by firmware), fall back to raw.
      */
-    private fun depair(raw: ByteArray): ByteArray {
-        if (raw.size >= 4 && raw.size % 2 == 0 && looksPaired(raw)) {
-            return ByteArray(raw.size / 2) { raw[it * 2] }
-        }
-        return raw
+    private fun depair(raw: ByteArray): ByteArray = when (config.depair) {
+        "on" -> if (raw.size >= 2) ByteArray(raw.size / 2) { raw[it * 2] } else raw
+        "off" -> raw
+        else -> if (raw.size >= 4 && raw.size % 2 == 0 && looksPaired(raw)) {
+            ByteArray(raw.size / 2) { raw[it * 2] }
+        } else raw
     }
 
     /** Heuristic: status bytes have the high bits mostly clear (delay*10ms). */

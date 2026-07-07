@@ -28,10 +28,13 @@ import kotlinx.coroutines.withContext
  */
 class DeepObdDiagnosticClient(
     private val transportFactory: (address: String) -> SppTransport,
-    private val ecuAddress: Int = 0x01,
-    private val kwpBaud: Int = 9600,
+    var ecuAddress: Int = 0x01,
+    var kwpBaud: Int = 9600,
     var readOnly: Boolean = false,
 ) : DiagnosticClient {
+
+    /** Live-tunable framing config used at next connect (debug bridge). */
+    var kwpConfig: Kwp1281Config = Kwp1281Config()
 
     private val state = MutableStateFlow(ConnectionState.DISCONNECTED)
     private var transport: SppTransport? = null
@@ -73,7 +76,7 @@ class DeepObdDiagnosticClient(
         }
 
         // Live KWP1281 init: 5-baud wake (firmware) + pump the ECU ID blocks.
-        val s = Kwp1281Session(t, baud = kwpBaud, ecuAddress = ecuAddress)
+        val s = Kwp1281Session(t, baud = kwpBaud, ecuAddress = ecuAddress, config = kwpConfig)
         val idResult = s.connect()
         if (idResult.isFailure) {
             state.value = ConnectionState.ERROR
@@ -132,6 +135,28 @@ class DeepObdDiagnosticClient(
 
     /** Adapter info exposed for the UI (firmware/battery from probe). */
     fun adapterInfo(): AdapterInfo? = adapter
+
+    /** Debug: send raw bytes straight to the adapter and return the response. */
+    suspend fun debugRaw(bytes: ByteArray, timeoutMs: Long = 1500): ByteArray =
+        withContext(Dispatchers.IO) {
+            val t = transport ?: return@withContext ByteArray(0)
+            t.write(bytes)
+            t.read(256, timeoutMs)
+        }
+
+    /** Debug: is a transport currently open? */
+    fun isTransportOpen(): Boolean = transport?.isConnected == true
+
+    /** Debug: adapter battery voltage via the FC status telegram (×0.1 V). */
+    suspend fun debugVoltage(): Double? = withContext(Dispatchers.IO) {
+        val t = transport ?: return@withContext null
+        t.write(AdapterProtocol.READ_VOLTAGE)
+        val r = t.read(64, 1000)
+        if (r.size < 6) null else (r[r.size - 2].toInt() and 0xFF) * 0.1
+    }
+
+    /** Debug: the raw ECU identification blocks captured at connect. */
+    fun debugIdBlocks(): List<String> = session?.identificationBlocks().orEmpty()
 
     /** Map a raw session failure onto a typed DiagnosticError result. */
     private fun <T> Result<T>.recover1(): Result<T> = recoverCatching {
