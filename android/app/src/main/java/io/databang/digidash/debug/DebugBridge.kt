@@ -108,6 +108,27 @@ class DebugBridge(
                     Log.i(TAG, "exitBasicSettings -> " +
                         r.map { "OK" }.getOrElse { "ERR ${it.asDiagnosticError().userMessage()}" })
                 }
+                "dongles" -> {
+                    val provider = container.dongleProvider
+                    Log.i(TAG, "hasPermission=${provider.hasPermission()}")
+                    provider.pairedDevices().forEach { Log.i(TAG, "paired: ${it.name} ${it.address}") }
+                    Log.i(TAG, "starting discovery…")
+                    provider.startDiscovery(
+                        onFound = { Log.i(TAG, "found: ${it.name} ${it.address}") },
+                        onDone = { Log.i(TAG, "discovery done") },
+                    )
+                }
+                "setdongle" -> {
+                    val mac = intent.getStringExtra("mac")
+                    val name = intent.getStringExtra("name") ?: "OBDII"
+                    if (mac.isNullOrBlank()) { Log.w(TAG, "setdongle: need --es mac XX:XX:..") ; return@launch }
+                    container.prefs.edit()
+                        .putString(AppContainer.PREF_DONGLE_ADDRESS, mac)
+                        .putString(AppContainer.PREF_DONGLE_NAME, name)
+                        .apply()
+                    Log.i(TAG, "dongle set to $name $mac")
+                }
+                "blescan" -> runBleScan(context)
                 "voltage" -> Log.i(TAG, "voltage -> ${client.debugVoltage()} V")
                 "id" -> Log.i(TAG, "id blocks -> ${client.debugIdBlocks()}")
                 "adapter" -> Log.i(TAG, "adapter -> ${client.adapterInfo()}")
@@ -130,6 +151,39 @@ class DebugBridge(
                 }
                 else -> Log.w(TAG, "unknown cmd: $cmd")
             }
+        }
+    }
+
+    @android.annotation.SuppressLint("MissingPermission")
+    private fun runBleScan(context: Context) {
+        val adapter = context.getSystemService(android.bluetooth.BluetoothManager::class.java)?.adapter
+        val scanner = adapter?.bluetoothLeScanner
+        if (scanner == null) { Log.w(TAG, "no BLE scanner"); return }
+        Log.i(TAG, "BLE scan starting…")
+        val cb = object : android.bluetooth.le.ScanCallback() {
+            override fun onScanResult(type: Int, result: android.bluetooth.le.ScanResult) {
+                // BLE devices advertise their name in the scan record.
+                val advName = result.scanRecord?.deviceName
+                val devName = try { result.device.name } catch (e: SecurityException) { null }
+                val name = advName ?: devName
+                // Only log NAMED devices (cuts the noise of anonymous beacons).
+                if (!name.isNullOrBlank()) {
+                    Log.i(TAG, "BLE named: $name ${result.device.address} rssi=${result.rssi}")
+                }
+            }
+        }
+        val settings = android.bluetooth.le.ScanSettings.Builder()
+            .setScanMode(android.bluetooth.le.ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .build()
+        try {
+            scanner.startScan(null, settings, cb)
+            sessionHolder.scope.launch {
+                kotlinx.coroutines.delay(15000)
+                runCatching { scanner.stopScan(cb) }
+                Log.i(TAG, "BLE scan done")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "BLE scan error: ${e.message}")
         }
     }
 

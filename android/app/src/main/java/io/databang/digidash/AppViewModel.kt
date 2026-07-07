@@ -388,16 +388,29 @@ class AppViewModel(
     fun scanDongles() {
         if (_ui.value.scanning) return
         stopScan?.invoke()
-        _ui.update { it.copy(scanning = true) }
+        // Include already-paired devices too (Android discovery does NOT re-report
+        // bonded ones), then add discovered devices as they arrive.
+        val paired = container.dongleProvider.pairedDevices()
+        _ui.update { it.copy(scanning = true, dongles = mergeDongles(it.dongles, paired)) }
         stopScan = container.dongleProvider.startDiscovery(
-            onFound = { dev ->
-                _ui.update { st ->
-                    if (st.dongles.any { it.address == dev.address }) st
-                    else st.copy(dongles = st.dongles + dev)
-                }
-            },
+            onFound = { dev -> _ui.update { st -> st.copy(dongles = mergeDongles(st.dongles, listOf(dev))) } },
             onDone = { _ui.update { it.copy(scanning = false) } },
         )
+    }
+
+    /** Merge device lists (dedup by address) and float likely OBD dongles to the top. */
+    private fun mergeDongles(
+        current: List<DongleDevice>,
+        add: List<DongleDevice>,
+    ): List<DongleDevice> =
+        (current + add).distinctBy { it.address }
+            .sortedWith(compareByDescending<DongleDevice> { isLikelyObd(it.name) }
+                .thenBy { it.name.lowercase() })
+
+    private fun isLikelyObd(name: String): Boolean {
+        val n = name.lowercase()
+        return listOf("obd", "elm", "vgate", "viecar", "konnwei", "vlink", "kkl",
+            "can", "327", "obdii", "digi").any { it in n }
     }
 
     fun stopScanning() {

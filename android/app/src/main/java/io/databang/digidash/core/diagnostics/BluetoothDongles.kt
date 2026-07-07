@@ -94,10 +94,13 @@ class AndroidDongleProvider(private val context: Context) : DongleProvider {
             addAction(BluetoothDevice.ACTION_FOUND)
             addAction(android.bluetooth.BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
         }
-        ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        // Bluetooth discovery broadcasts are system/protected; some OEMs
+        // (Samsung) only deliver them to an EXPORTED context receiver.
+        ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_EXPORTED)
         try {
             if (a.isDiscovering) a.cancelDiscovery()
-            a.startDiscovery()
+            val started = a.startDiscovery()
+            android.util.Log.i("DIGIDASH_DBG", "startDiscovery() returned $started")
         } catch (e: SecurityException) {
             onDone()
         }
