@@ -104,59 +104,117 @@ class Kwp1281Session(
             }
             sendAck()
         }
+        // KWP1281 needs a continuous ACK keep-alive (<500 ms) or the ECU drops
+        // the session; run the block exchange on a background loop that also
+        // injects on-demand commands (group/DTC/basic-settings).
+        startLoop()
         idBlocks.toList()
     }
 
+    // --- Persistent keep-alive session loop ---
+
+    private class PendingCommand(
+        val title: Int,
+        val data: ByteArray,
+        /** Collect ECU blocks until an ACK (DTC read) vs a single response block. */
+        val collectUntilAck: Boolean,
+    ) {
+        val response = java.util.concurrent.SynchronousQueue<List<Block>>()
+    }
+
+    @Volatile private var running = false
+    private var loopThread: Thread? = null
+    private val commandQueue = java.util.concurrent.LinkedBlockingQueue<PendingCommand>()
+
+    private fun startLoop() {
+        running = true
+        loopThread = Thread {
+            var pending: PendingCommand? = null
+            val collected = mutableListOf<Block>()
+            try {
+            while (running) {
+                // 1. Read the ECU's block (its turn).
+                val ecuBlock = readBlock()
+                if (ecuBlock == null) { running = false; break }
+                // 2. Deliver to a waiting command.
+                if (pending != null) {
+                    collected.add(ecuBlock)
+                    val done = if (pending.collectUntilAck) ecuBlock.title == Kwp1281Protocol.TITLE_ACK else true
+                    if (done) {
+                        pending.response.offer(collected.toList())
+                        collected.clear(); pending = null
+                    }
+                }
+                // 3. Host transmits exactly once: a queued command or a keep-alive ACK.
+                if (pending == null) {
+                    val next = commandQueue.poll()
+                    if (next != null) {
+                        sendBlock(next.title, next.data); pending = next; collected.clear()
+                    } else sendAck()
+                } else {
+                    sendAck() // still collecting a multi-block response
+                }
+            }
+            } catch (e: Exception) {
+                android.util.Log.i(TAG, "kwp: session loop ended: ${e.message}")
+            } finally {
+                running = false
+            }
+        }.also { it.isDaemon = true; it.name = "kwp1281-session"; it.start() }
+    }
+
+    /** Enqueue a command and wait for its response block(s). */
+    private fun exchange(title: Int, data: ByteArray, collectUntilAck: Boolean = false): List<Block> {
+        if (!running) error("session not connected")
+        val cmd = PendingCommand(title, data, collectUntilAck)
+        commandQueue.offer(cmd)
+        return cmd.response.poll(2500, java.util.concurrent.TimeUnit.MILLISECONDS)
+            ?: error("no response (session timeout)")
+    }
+
     fun readGroup(group: Int): Result<RawMeasuringBlock> = runCatching {
-        sendBlock(Kwp1281Protocol.TITLE_GROUP_REQUEST, byteArrayOf(group.toByte()))
-        val resp = readBlock() ?: error("no group response for $group")
-        val fields: List<RawField> = when (resp.title) {
-            Kwp1281Protocol.TITLE_GROUP_RESPONSE -> Kwp1281Protocol.decodeGroup(group, resp.data)
-            Kwp1281Protocol.TITLE_NO_DATA -> error("group $group not supported by ECU")
-            else -> Kwp1281Protocol.decodeGroup(group, resp.data)
-        }
-        sendAck()
-        RawMeasuringBlock(group = group, fields = fields, timestampMillis = System.currentTimeMillis())
+        val resp = exchange(Kwp1281Protocol.TITLE_GROUP_REQUEST, byteArrayOf(group.toByte()))
+        val block = resp.firstOrNull { it.title == Kwp1281Protocol.TITLE_GROUP_RESPONSE }
+            ?: resp.firstOrNull()
+            ?: error("no group response for $group")
+        if (block.title == Kwp1281Protocol.TITLE_NO_DATA) error("group $group not supported")
+        RawMeasuringBlock(
+            group = group,
+            fields = Kwp1281Protocol.decodeGroup(group, block.data),
+            timestampMillis = System.currentTimeMillis(),
+        )
     }
 
     fun readDtc(): Result<List<RawDtc>> = runCatching {
-        sendBlock(Kwp1281Protocol.TITLE_DTC_REQUEST, ByteArray(0))
-        val dtcs = mutableListOf<RawDtc>()
-        var guard = 0
-        var block = readBlock()
-        while (block != null && guard++ < 16) {
-            if (block.title == Kwp1281Protocol.TITLE_DTC_RESPONSE) {
-                dtcs += Kwp1281Protocol.decodeDtcResponse(block.data)
-            }
-            sendAck()
-            if (block.title == Kwp1281Protocol.TITLE_ACK) break
-            block = readBlock()
-        }
-        dtcs
+        val resp = exchange(Kwp1281Protocol.TITLE_DTC_REQUEST, ByteArray(0), collectUntilAck = true)
+        resp.filter { it.title == Kwp1281Protocol.TITLE_DTC_RESPONSE }
+            .flatMap { Kwp1281Protocol.decodeDtcResponse(it.data) }
     }
 
     fun clearDtc(): Result<Unit> = runCatching {
-        sendBlock(Kwp1281Protocol.TITLE_DTC_CLEAR, ByteArray(0))
-        // ECU replies with an ACK block on success.
-        readBlock()
-        sendAck()
+        exchange(Kwp1281Protocol.TITLE_DTC_CLEAR, ByteArray(0))
+        Unit
     }
 
-    /**
-     * Enter Basic Settings for [group] (adjustment mode) — like a group read but
-     * with the basic-setting title, which keeps the ECU cycling that group.
-     * Returns the first block of values.
-     */
     fun enterBasicSettings(group: Int): Result<RawMeasuringBlock> = runCatching {
-        sendBlock(Kwp1281Protocol.TITLE_BASIC_SETTING, byteArrayOf(group.toByte()))
-        val resp = readBlock() ?: error("no basic-setting response for $group")
-        val fields = Kwp1281Protocol.decodeGroup(group, resp.data)
-        sendAck()
-        RawMeasuringBlock(group = group, fields = fields, timestampMillis = System.currentTimeMillis())
+        val resp = exchange(Kwp1281Protocol.TITLE_BASIC_SETTING, byteArrayOf(group.toByte()))
+        val block = resp.firstOrNull() ?: error("no basic-setting response for $group")
+        RawMeasuringBlock(
+            group = group,
+            fields = Kwp1281Protocol.decodeGroup(group, block.data),
+            timestampMillis = System.currentTimeMillis(),
+        )
     }
 
     fun exitBasicSettings(): Result<Unit> = runCatching {
-        sendBlock(Kwp1281Protocol.TITLE_END_OUTPUT, ByteArray(0))
+        exchange(Kwp1281Protocol.TITLE_END_OUTPUT, ByteArray(0))
+        Unit
+    }
+
+    fun close() {
+        running = false
+        loopThread?.interrupt()
+        loopThread = null
     }
 
     private fun sendAck() {

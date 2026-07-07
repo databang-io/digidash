@@ -98,6 +98,7 @@ class DeepObdDiagnosticClient(
     }
 
     override suspend fun disconnect() {
+        runCatching { session?.close() }
         runCatching { transport?.close() }
         transport = null
         session = null
