@@ -47,6 +47,8 @@ fun TechScreen(
     onReadGroup: (Int) -> Unit,
     onToggleRealBackend: (Boolean) -> Unit,
     onExportCapture: ((String) -> Unit) -> Unit,
+    onToggleAlerts: (Boolean) -> Unit,
+    onResetPeaks: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -55,6 +57,7 @@ fun TechScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item { BackendCard(state, onToggleRealBackend) }
+        item { AlertsCard(state, onToggleAlerts, onResetPeaks) }
         if (!state.useRealBackend) {
             item { ScenarioCard(state.scenario, onScenario) }
         }
@@ -72,6 +75,31 @@ fun TechScreen(
                     "No measuring blocks yet. Connect first (Home tab).",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlertsCard(state: AppUiState, onToggle: (Boolean) -> Unit, onResetPeaks: () -> Unit) {
+    Card {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Threshold alerts (buzz + beep)",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(checked = state.alertsEnabled, onCheckedChange = onToggle)
+            }
+            Text(
+                "Vibrates and beeps when a value crosses into warning or critical — " +
+                    "e.g. coolant overheating — even when you're on another screen.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            androidx.compose.material3.OutlinedButton(onClick = onResetPeaks) {
+                Text("Reset min/max peaks")
             }
         }
     }

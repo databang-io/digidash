@@ -47,6 +47,9 @@ data class AppUiState(
     val remoteRepoUrl: String = "",
     val remoteRepoEnabled: Boolean = false,
     val useRealBackend: Boolean = false,
+    val alertsEnabled: Boolean = true,
+    /** Min/max per card key over the session (peak hold). */
+    val peaks: Map<String, io.databang.digidash.core.history.PeakHold> = emptyMap(),
     val errorMessage: String? = null,
     val connecting: Boolean = false,
 ) {
@@ -79,6 +82,10 @@ class AppViewModel(
     private val session = sessionHolder.session
     private val tripLog = sessionHolder.tripLog
 
+    private val history = io.databang.digidash.core.history.MeasurementHistory()
+    /** Last alert-status per key so we only alert on transitions into a bad state. */
+    private val lastAlertStatus = HashMap<String, MeasurementStatus>()
+
     /** Persisted custom dashboard order (card keys); null = model default order. */
     private var cardOrder: List<String>? =
         container.prefs.getString(AppContainer.PREF_CARD_ORDER, null)
@@ -90,6 +97,7 @@ class AppViewModel(
             remoteRepoUrl = container.prefs.getString(AppContainer.PREF_REMOTE_REPO_URL, "") ?: "",
             remoteRepoEnabled = container.prefs.getBoolean(AppContainer.PREF_REMOTE_REPO_ENABLED, false),
             useRealBackend = container.useRealBackend,
+            alertsEnabled = container.alertsEnabled,
             selectedDongle = savedDongle(),
         )
     )
@@ -137,7 +145,10 @@ class AppViewModel(
         }
         // Rebuild cards on new measurements and once per second for staleness.
         viewModelScope.launch {
-            session.measurements.collect { rebuildDerivedState(it) }
+            session.measurements.collect {
+                recordAndAlert(it)
+                rebuildDerivedState(it)
+            }
         }
         viewModelScope.launch {
             while (isActive) {
@@ -224,6 +235,12 @@ class AppViewModel(
     }
 
     fun logFilePath(log: LogFile): String = log.path
+
+    fun parseLog(path: String): io.databang.digidash.core.logging.ReplayData =
+        io.databang.digidash.core.logging.LogReplay.parse(java.io.File(path))
+
+    fun cardFor(key: String) = _ui.value.cards.find { it.key == key }
+    fun peakFor(key: String) = _ui.value.peaks[key]
 
     // --- Raw blocks on demand ---
 
@@ -379,6 +396,43 @@ class AppViewModel(
             )
         }
     }
+
+    /** Record numeric history + peaks and fire an alert on a bad-status transition. */
+    private fun recordAndAlert(measurements: Map<String, InterpretedMeasurement>) {
+        var anyNewCritical = false
+        var anyNewWarning = false
+        for (m in measurements.values) {
+            m.value?.let { history.record(m.key, m.timestampMillis, it) }
+            val prev = lastAlertStatus.put(m.key, m.status)
+            if (prev != m.status) {
+                when (m.status) {
+                    MeasurementStatus.CRITICAL -> if (prev != MeasurementStatus.CRITICAL) anyNewCritical = true
+                    MeasurementStatus.WARNING -> if (prev == MeasurementStatus.NORMAL || prev == null) anyNewWarning = true
+                    else -> {}
+                }
+            }
+        }
+        if (container.alertsEnabled && (anyNewCritical || anyNewWarning)) {
+            container.alerter.alert(critical = anyNewCritical)
+        }
+        _ui.update { it.copy(peaks = peakSnapshot()) }
+    }
+
+    private fun peakSnapshot(): Map<String, io.databang.digidash.core.history.PeakHold> =
+        _ui.value.cards.mapNotNull { c -> history.peak(c.key)?.let { c.key to it } }.toMap()
+
+    fun setAlertsEnabled(enabled: Boolean) {
+        container.alertsEnabled = enabled
+        _ui.update { it.copy(alertsEnabled = enabled) }
+    }
+
+    fun resetPeaks() {
+        history.reset()
+        lastAlertStatus.clear()
+        _ui.update { it.copy(peaks = emptyMap()) }
+    }
+
+    fun historyOf(key: String): List<io.databang.digidash.core.history.Sample> = history.history(key)
 
     /** Reorder cards by the saved custom order; unknown keys keep model order at the end. */
     private fun applyCardOrder(cards: List<DashboardCardState>): List<DashboardCardState> {

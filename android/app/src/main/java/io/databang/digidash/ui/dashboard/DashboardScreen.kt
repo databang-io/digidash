@@ -52,7 +52,9 @@ private val gaugeRanges = mapOf(
 fun DashboardScreen(
     cards: List<DashboardCardState>,
     connected: Boolean,
+    peaks: Map<String, io.databang.digidash.core.history.PeakHold> = emptyMap(),
     onReorder: (List<String>) -> Unit = {},
+    onCardClick: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (cards.isEmpty() || !connected) {
@@ -83,16 +85,24 @@ fun DashboardScreen(
         cards = cards,
         onReorder = onReorder,
         modifier = modifier,
-        cell = { card, isDragged -> DashboardCard(card, isDragged) },
+        cell = { card, isDragged ->
+            DashboardCard(card, peaks[card.key], isDragged) { onCardClick(card.key) }
+        },
     )
 }
 
 @Composable
-private fun DashboardCard(card: DashboardCardState, isDragged: Boolean = false) {
+private fun DashboardCard(
+    card: DashboardCardState,
+    peak: io.databang.digidash.core.history.PeakHold? = null,
+    isDragged: Boolean = false,
+    onClick: () -> Unit = {},
+) {
     val statusColor = card.statusColor()
     val elevation = if (isDragged) 12.dp else 0.dp
     val scale = if (isDragged) 1.06f else 1f
     Card(
+        onClick = onClick,
         modifier = Modifier
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .zIndex(if (isDragged) 1f else 0f),
@@ -142,6 +152,14 @@ private fun DashboardCard(card: DashboardCardState, isDragged: Boolean = false) 
                         color = StatusColors.warning,
                     )
                 }
+                if (peak != null && card.valueText.toDoubleOrNull() != null) {
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        text = "↓${fmt(peak.min)} ↑${fmt(peak.max)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 if (card.lowConfidence) {
                     Spacer(Modifier.padding(horizontal = 4.dp))
                     Icon(
@@ -155,6 +173,9 @@ private fun DashboardCard(card: DashboardCardState, isDragged: Boolean = false) 
         }
     }
 }
+
+private fun fmt(v: Double): String =
+    if (v % 1.0 == 0.0) v.toLong().toString() else String.format(java.util.Locale.US, "%.1f", v)
 
 private fun DashboardCardState.statusColor(): Color = when (status) {
     MeasurementStatus.NORMAL -> StatusColors.normal

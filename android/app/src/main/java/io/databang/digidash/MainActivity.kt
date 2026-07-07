@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
@@ -36,6 +37,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import io.databang.digidash.ui.dashboard.DashboardScreen
 import io.databang.digidash.ui.dtc.DtcScreen
+import io.databang.digidash.ui.graph.GaugeDetailScreen
+import io.databang.digidash.ui.graph.ReplayScreen
 import io.databang.digidash.ui.home.HomeScreen
 import io.databang.digidash.ui.ignition.IgnitionScreen
 import io.databang.digidash.ui.logs.LogsScreen
@@ -110,8 +113,28 @@ fun DigiDashApp(container: AppContainer, sessionHolder: SessionHolder) {
                 DashboardScreen(
                     cards = state.cards,
                     connected = state.connected,
+                    peaks = state.peaks,
                     onReorder = viewModel::saveCardOrder,
+                    onCardClick = { key -> navController.navigate("detail/$key") },
                 )
+            }
+            composable("detail/{key}") { entry ->
+                val key = entry.arguments?.getString("key").orEmpty()
+                GaugeDetailScreen(
+                    card = viewModel.cardFor(key),
+                    history = viewModel.historyOf(key),
+                    peak = viewModel.peakFor(key),
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable("replay/{name}") { entry ->
+                val name = entry.arguments?.getString("name").orEmpty()
+                val path = state.logs.find { it.name == name }?.path
+                val data = remember(path) {
+                    path?.let { viewModel.parseLog(it) }
+                        ?: io.databang.digidash.core.logging.ReplayData(emptyList(), emptyMap(), emptyMap())
+                }
+                ReplayScreen(fileName = name, data = data, onBack = { navController.popBackStack() })
             }
             composable(Destination.DTC.route) {
                 DtcScreen(
@@ -123,6 +146,7 @@ fun DigiDashApp(container: AppContainer, sessionHolder: SessionHolder) {
             composable(Destination.IGNITION.route) {
                 IgnitionScreen(
                     state = state,
+                    lambdaHistory = viewModel.historyOf("lambda_signal"),
                     onNote = viewModel::addLogNote,
                     onEnterBasicSettings = viewModel::enterBasicSettingsConfirmed,
                     onExitBasicSettings = viewModel::exitBasicSettings,
@@ -134,6 +158,7 @@ fun DigiDashApp(container: AppContainer, sessionHolder: SessionHolder) {
                     onToggleRecording = viewModel::toggleRecording,
                     onRefresh = viewModel::refreshLogs,
                     onDelete = viewModel::deleteLog,
+                    onOpenGraph = { log -> navController.navigate("replay/${log.name}") },
                 )
             }
             composable(Destination.TECH.route) {
@@ -144,6 +169,8 @@ fun DigiDashApp(container: AppContainer, sessionHolder: SessionHolder) {
                     onReadGroup = viewModel::readGroup,
                     onToggleRealBackend = viewModel::setUseRealBackend,
                     onExportCapture = viewModel::exportCapture,
+                    onToggleAlerts = viewModel::setAlertsEnabled,
+                    onResetPeaks = viewModel::resetPeaks,
                 )
             }
         }

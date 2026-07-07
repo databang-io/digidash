@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.Share
@@ -49,6 +50,7 @@ fun LogsScreen(
     onToggleRecording: () -> Unit,
     onRefresh: () -> Unit,
     onDelete: (LogFile) -> Unit,
+    onOpenGraph: (LogFile) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -113,6 +115,9 @@ fun LogsScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                        }
+                        IconButton(onClick = { onOpenGraph(log) }) {
+                            Icon(Icons.AutoMirrored.Filled.ShowChart, contentDescription = "Graph")
                         }
                         IconButton(onClick = { shareLog(context, log) }) {
                             Icon(Icons.Default.Share, contentDescription = "Share")

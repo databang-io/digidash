@@ -62,6 +62,7 @@ private val guidance = listOf(
 @Composable
 fun IgnitionScreen(
     state: AppUiState,
+    lambdaHistory: List<io.databang.digidash.core.history.Sample>,
     onNote: (String) -> Unit,
     onEnterBasicSettings: () -> Unit,
     onExitBasicSettings: () -> Unit,
@@ -84,6 +85,8 @@ fun IgnitionScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item { WarningCard() }
+        item { WarmUpCard(state) }
+        item { LambdaCard(state, lambdaHistory) }
         item { ValuesCard(state) }
         item { ChecklistCard(ign, manualChecks) }
         item { GuidanceCard() }
@@ -116,6 +119,75 @@ private fun WarningCard() {
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(MANDATORY_WARNING, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+}
+
+private const val OPERATING_TEMP = 80.0
+
+@Composable
+private fun WarmUpCard(state: AppUiState) {
+    val coolant = state.cards.firstNotNullOfOrNull {
+        if (it.key == "coolant_temp" || it.key == "coolant_temp_000") it.valueText.toDoubleOrNull() else null
+    }
+    Card {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Warm-up", style = MaterialTheme.typography.titleMedium)
+            if (coolant == null) {
+                Text("Coolant N/A — connect and let data flow.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                return@Column
+            }
+            val progress = (coolant / OPERATING_TEMP).coerceIn(0.0, 1.0).toFloat()
+            val ready = coolant >= OPERATING_TEMP
+            androidx.compose.material3.LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth(),
+                color = if (ready) StatusColors.normal else StatusColors.warning,
+            )
+            Text(
+                if (ready) "At operating temperature (${coolant.toInt()} °C) — ready for timing / Basic Settings."
+                else "Warming up: ${coolant.toInt()} °C / ${OPERATING_TEMP.toInt()} °C",
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (ready) StatusColors.normal else MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LambdaCard(
+    state: AppUiState,
+    history: List<io.databang.digidash.core.history.Sample>,
+) {
+    val lambda = state.cards.firstOrNull { it.key == "lambda_signal" }
+    Card {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Lambda / mixture", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "The lambda signal should oscillate continuously once the O2 sensor is warm. " +
+                    "A flat line = cold or faulty sensor; use it to set CO on the Digifant pot.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "Now: ${lambda?.valueText ?: "N/A"}",
+                style = MaterialTheme.typography.headlineSmall,
+            )
+            if (history.size >= 2) {
+                io.databang.digidash.ui.graph.LineChart(
+                    points = history.map {
+                        io.databang.digidash.ui.graph.ChartPoint(it.timeMillis.toDouble(), it.value)
+                    },
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                )
+            } else {
+                Text("Collecting lambda history…",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

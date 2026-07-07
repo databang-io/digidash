@@ -30,6 +30,12 @@ class AppContainer(private val appContext: Context) {
 
     val logRepository = LogRepository(appContext)
 
+    val alerter = io.databang.digidash.core.alert.Alerter(appContext)
+
+    var alertsEnabled: Boolean
+        get() = prefs.getBoolean(PREF_ALERTS_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(PREF_ALERTS_ENABLED, value).apply()
+
     val interpreter: MeasurementInterpreter = DefaultMeasurementInterpreter()
 
     val fakeClient = FakeDiagnosticClient(jitter = true, operationDelayMillis = 200)
@@ -79,6 +85,7 @@ class AppContainer(private val appContext: Context) {
         const val PREF_DONGLE_NAME = "dongle_name"
         const val PREF_USE_REAL_BACKEND = "use_real_backend"
         const val PREF_CARD_ORDER = "dashboard_card_order"
+        const val PREF_ALERTS_ENABLED = "alerts_enabled"
 
         const val DEFAULT_REMOTE_REPO_HINT =
             "https://raw.githubusercontent.com/<user>/<repo>/main/ecu_models"
