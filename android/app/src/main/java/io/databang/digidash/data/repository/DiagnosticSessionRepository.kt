@@ -200,10 +200,13 @@ class DiagnosticSessionRepository(
         pollJob = scope.launch {
             var i = 0
             while (isActive) {
-                // While in Basic Settings, prioritise the ignition-advance group
-                // so the user sees timing change as they rotate the distributor.
-                val group = if (_basicSettingsActive.value) basicSettingsGroup
-                    else tripGroups[i % tripGroups.size]
+                // While in Basic Settings, read the ignition-advance group every
+                // other cycle so the advance updates fast WITHOUT freezing the
+                // other cards (which would otherwise go stale).
+                val group = when {
+                    _basicSettingsActive.value && i % 2 == 0 -> basicSettingsGroup
+                    else -> tripGroups[(i / if (_basicSettingsActive.value) 2 else 1) % tripGroups.size]
+                }
                 i++
                 sessionMutex.withLock {
                     client.readMeasuringBlock(group)

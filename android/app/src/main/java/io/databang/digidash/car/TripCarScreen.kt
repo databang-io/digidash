@@ -63,7 +63,8 @@ class TripCarScreen(carContext: CarContext) : Screen(carContext) {
                     .build()
             )
         } else {
-            val rows = model?.tripCardFields()?.take(6).orEmpty()
+            // Head-unit Pane row cap is small; keep the 4 most critical + DTC row.
+            val rows = model?.tripCardFields()?.take(4).orEmpty()
             if (rows.isEmpty()) {
                 pane.addRow(Row.Builder().setTitle("Waiting for data…").build())
             } else {

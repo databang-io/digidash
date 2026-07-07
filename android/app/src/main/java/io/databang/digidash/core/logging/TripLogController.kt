@@ -55,13 +55,22 @@ class TripLogController(
         _recording.value = true
         csv.logEvent(session.connectionState.value.name, "log started")
 
-        // Snapshot every measurement on each update.
+        // Log only fields that actually changed since the last poll — the
+        // measurements map re-emits in full on every single-group update, so
+        // diffing avoids ~6× duplicated rows.
+        val lastLogged = HashMap<String, String>()
         sampleJob = scope.launch {
             session.measurements.collect { map ->
                 if (!_recording.value) return@collect
                 val state = session.connectionState.value.name
-                logger?.logMeasurements(state, map.values)
-                logger?.flush()
+                val changed = map.values.filter { m ->
+                    val stamp = "${m.rawString}@${m.timestampMillis}"
+                    (lastLogged.put(m.key, stamp) != stamp)
+                }
+                if (changed.isNotEmpty()) {
+                    logger?.logMeasurements(state, changed)
+                    logger?.flush()
+                }
             }
         }
         // Mirror session events.

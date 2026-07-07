@@ -41,7 +41,7 @@ object Kwp1281Protocol {
             0x07 -> 0.01 * a * b              // speed km/h
             0x0F -> 0.01 * a * b              // time ms
             0x12 -> 0.001 * a * b             // pressure/voltage
-            0x21 -> if (a != 0) 100.0 * b / a else 0.0 // percent
+            0x21 -> if (a != 0) 100.0 * b / a else null // percent (null, never fake 0)
             0x04, 0x1B -> kotlin.math.abs(b - 127) * 0.01 * a // ignition deg
             else -> null
         }

@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,8 +71,11 @@ fun IgnitionScreen(
     val manualChecks = remember { mutableStateMapOf<String, Boolean>() }
 
     // Safety: always leave Basic Settings when the screen is disposed.
+    // Capture live values so the closure doesn't read the initial (false) state.
+    val activeNow by rememberUpdatedState(ign.basicSettingsActive)
+    val exitNow by rememberUpdatedState(onExitBasicSettings)
     DisposableEffect(Unit) {
-        onDispose { if (ign.basicSettingsActive) onExitBasicSettings() }
+        onDispose { if (activeNow) exitNow() }
     }
 
     LazyColumn(
@@ -127,7 +131,7 @@ private fun ValuesCard(state: AppUiState) {
             ValueLine(byKey, "RPM", "rpm", "rpm_000")
             ValueLine(byKey, "Battery", "battery_voltage")
             ValueLine(byKey, "Ignition advance (ECU)", "ignition_advance")
-            ValueLine(byKey, "Throttle", "throttle_angle", "idle_state")
+            ValueLine(byKey, "Throttle", "throttle_angle")
             ValueLine(byKey, "DTC count", "dtc_count")
             Text(
                 "Target timing not configured — the app does not invent a value. " +

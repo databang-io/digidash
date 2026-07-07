@@ -114,7 +114,10 @@ class AppViewModel(
             session.dtcCount.collect { c -> _ui.update { it.copy(dtcCount = c) } }
         }
         viewModelScope.launch {
-            session.dtcs.collect { list -> _ui.update { it.copy(dtcs = list) } }
+            session.dtcs.collect { list ->
+                _ui.update { it.copy(dtcs = list) }
+                rebuildDerivedState(session.measurements.value)
+            }
         }
         viewModelScope.launch {
             session.basicSettingsActive.collect { active ->
@@ -344,7 +347,11 @@ class AppViewModel(
                         title = "DTC",
                         valueText = count.toString(),
                         unit = "",
-                        status = if (count == 0) MeasurementStatus.NORMAL else MeasurementStatus.WARNING,
+                        status = when {
+                            count == 0 -> MeasurementStatus.NORMAL
+                            state.dtcs.any { it.severity == DtcSeverity.CRITICAL } -> MeasurementStatus.CRITICAL
+                            else -> MeasurementStatus.WARNING
+                        },
                     )
                 }
             )

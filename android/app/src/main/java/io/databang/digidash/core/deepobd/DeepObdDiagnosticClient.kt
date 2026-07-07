@@ -72,6 +72,11 @@ class DeepObdDiagnosticClient(
         // KWP1281 5-baud init is driven by the adapter firmware via a pulse
         // telegram. The full key-byte exchange is validated on the vehicle.
         sessionReady = initKwp1281(t)
+        if (!sessionReady) {
+            // Adapter is reachable but the ECU did not come up on the K-line.
+            state.value = ConnectionState.ERROR
+            return@withContext diagnosticFailure<Unit>(DiagnosticError.EcuNoResponse)
+        }
         state.value = ConnectionState.CONNECTED
         Result.success(Unit)
     }
