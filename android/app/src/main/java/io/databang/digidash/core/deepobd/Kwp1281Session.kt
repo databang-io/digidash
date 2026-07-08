@@ -213,21 +213,33 @@ class Kwp1281Session(
         if (!running) error("session not connected")
         val cmd = PendingCommand(title, data, terminal, keepAcks)
         commandQueue.offer(cmd)
-        return cmd.response.poll(2500, java.util.concurrent.TimeUnit.MILLISECONDS)
+        // Generous: at ~1200 baud a reply can queue behind a slow spontaneous
+        // block read; the loop delivers an empty list promptly on a real miss.
+        return cmd.response.poll(5000, java.util.concurrent.TimeUnit.MILLISECONDS)
             ?: error("no response (session timeout)")
     }
 
     fun readGroup(group: Int): Result<RawMeasuringBlock> = runCatching {
         // Early Digifant answers a PARAM-LESS raw read (title 0x12 -> 0xF4) for
-        // group 0; numbered groups use the VAG-COM 0x29 -> 0xE7 service.
-        val resp = if (group == 0)
-            exchange(Kwp1281Protocol.TITLE_RAW_DATA_REQUEST, ByteArray(0))
-        else
-            exchange(Kwp1281Protocol.TITLE_GROUP_REQUEST, byteArrayOf(group.toByte()))
-        val block = resp.firstOrNull { it.title in Kwp1281Protocol.MEASURING_TITLES }
-            ?: resp.firstOrNull { it.title != Kwp1281Protocol.TITLE_ACK }
+        // group 0; numbered groups use the VAG-COM 0x29 -> 0xE7 service. Match the
+        // SPECIFIC response title and skip the ECU's spontaneous 0x02/0xFC blocks,
+        // else a group request gets crossed with an unrelated push.
+        val reqTitle: Int
+        val reqData: ByteArray
+        val respTitle: Int
+        if (group == 0) {
+            reqTitle = Kwp1281Protocol.TITLE_RAW_DATA_REQUEST
+            reqData = ByteArray(0)
+            respTitle = Kwp1281Protocol.TITLE_RAW_DATA_RESPONSE
+        } else {
+            reqTitle = Kwp1281Protocol.TITLE_GROUP_REQUEST
+            reqData = byteArrayOf(group.toByte())
+            respTitle = Kwp1281Protocol.TITLE_GROUP_RESPONSE
+        }
+        val resp = exchange(reqTitle, reqData,
+            terminal = { it.title == respTitle || it.title == Kwp1281Protocol.TITLE_NO_DATA })
+        val block = resp.firstOrNull { it.title == respTitle }
             ?: error("no measuring response for group $group")
-        if (block.title == Kwp1281Protocol.TITLE_NO_DATA) error("group $group not supported")
         RawMeasuringBlock(
             group = group,
             fields = Kwp1281Protocol.decodeGroup(group, block.data),
@@ -254,10 +266,16 @@ class Kwp1281Session(
 
     fun enterBasicSettings(group: Int): Result<RawMeasuringBlock> = runCatching {
         // Early Digifant Basic Settings is a param-less start (title 0x11 -> 0xF4).
-        val resp = exchange(Kwp1281Protocol.TITLE_BASIC_SETTING_START, ByteArray(0))
-        val block = resp.firstOrNull { it.title in Kwp1281Protocol.MEASURING_TITLES }
-            ?: resp.firstOrNull { it.title != Kwp1281Protocol.TITLE_ACK }
-            ?: error("no basic-setting response")
+        val resp = exchange(Kwp1281Protocol.TITLE_BASIC_SETTING_START, ByteArray(0),
+            terminal = {
+                it.title == Kwp1281Protocol.TITLE_RAW_DATA_RESPONSE ||
+                    it.title == Kwp1281Protocol.TITLE_GROUP_RESPONSE ||
+                    it.title == Kwp1281Protocol.TITLE_NO_DATA
+            })
+        val block = resp.firstOrNull {
+            it.title == Kwp1281Protocol.TITLE_RAW_DATA_RESPONSE ||
+                it.title == Kwp1281Protocol.TITLE_GROUP_RESPONSE
+        } ?: error("no basic-setting response")
         RawMeasuringBlock(
             group = group,
             fields = Kwp1281Protocol.decodeGroup(group, block.data),
@@ -339,8 +357,10 @@ class Kwp1281Session(
             android.util.Log.i(TAG, "kwp: RX no valid block length")
             return null
         }
-        // Remaining logical bytes: counter, title, payload..., 0x03.
-        val body = readExact(len * unit, blockTimeoutMs)
+        // Remaining logical bytes: counter, title, payload..., 0x03. Scale the
+        // read window to the block size — a big block (e.g. the ECU's 49-byte
+        // 0x02 measuring dump) needs far longer than an ACK at ~1200 baud.
+        val body = readExact(len * unit, maxOf(blockTimeoutMs, len * 70L))
         if (body.size < len * unit) {
             android.util.Log.i(TAG, "kwp: RX block short ${body.size}/${len * unit}")
             return null
