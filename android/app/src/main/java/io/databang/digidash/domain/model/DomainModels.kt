@@ -105,6 +105,15 @@ data class InterpretedBlock(
     val measurements: List<InterpretedMeasurement>,
 )
 
+/** Dashboard card size on the grid: column span + whether it's taller. */
+enum class CardSize(val cols: Int, val tall: Boolean) {
+    SMALL(1, false),   // 1 column
+    WIDE(2, false),    // 2 columns
+    LARGE(2, true);    // 2 columns, taller (big gauge)
+
+    fun next(): CardSize = entries[(ordinal + 1) % entries.size]
+}
+
 /** State of a single dashboard card. Missing values are shown as N/A, never 0. */
 data class DashboardCardState(
     val key: String,
@@ -114,6 +123,7 @@ data class DashboardCardState(
     val status: MeasurementStatus,
     val stale: Boolean = false,
     val lowConfidence: Boolean = false,
+    val size: CardSize = CardSize.SMALL,
 ) {
     companion object {
         const val NOT_AVAILABLE = "N/A"

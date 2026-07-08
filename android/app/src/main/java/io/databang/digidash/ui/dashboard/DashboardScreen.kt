@@ -11,7 +11,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.background
+import androidx.compose.material3.Button
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
@@ -54,8 +57,12 @@ fun DashboardScreen(
     cards: List<DashboardCardState>,
     connected: Boolean,
     peaks: Map<String, io.databang.digidash.core.history.PeakHold> = emptyMap(),
+    editMode: Boolean = false,
     onReorder: (List<String>) -> Unit = {},
     onCardClick: (String) -> Unit = {},
+    onCycleSize: (String) -> Unit = {},
+    onEnterEditMode: () -> Unit = {},
+    onExitEditMode: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (cards.isEmpty() || !connected) {
@@ -81,15 +88,37 @@ fun DashboardScreen(
         return
     }
 
-    // Adaptive grid; long-press a card and drag to reorder (values stay live).
-    ReorderableGaugeGrid(
-        cards = cards,
-        onReorder = onReorder,
-        modifier = modifier,
-        cell = { card, isDragged ->
-            DashboardCard(card, peaks[card.key], isDragged) { onCardClick(card.key) }
-        },
-    )
+    Column(modifier = modifier.fillMaxSize()) {
+        if (editMode) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Editing — drag to move · tap a card to resize",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.weight(1f),
+                )
+                Button(onClick = onExitEditMode) { Text("Done") }
+            }
+        }
+        // Adaptive grid; long-press a card to enter edit mode + drag to reorder.
+        ReorderableGaugeGrid(
+            cards = cards,
+            onReorder = onReorder,
+            onEnterEditMode = onEnterEditMode,
+            modifier = Modifier.weight(1f),
+            cell = { card, isDragged ->
+                DashboardCard(card, peaks[card.key], isDragged, editMode) {
+                    if (editMode) onCycleSize(card.key) else onCardClick(card.key)
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -97,8 +126,14 @@ private fun DashboardCard(
     card: DashboardCardState,
     peak: io.databang.digidash.core.history.PeakHold? = null,
     isDragged: Boolean = false,
+    editMode: Boolean = false,
     onClick: () -> Unit = {},
 ) {
+    val gaugeHeight = when (card.size) {
+        io.databang.digidash.domain.model.CardSize.SMALL -> null
+        io.databang.digidash.domain.model.CardSize.WIDE -> 120.dp
+        io.databang.digidash.domain.model.CardSize.LARGE -> 190.dp
+    }
     val statusColor = card.statusColor()
     val elevation = if (isDragged) 12.dp else 0.dp
     val scale = if (isDragged) 1.06f else 1f
@@ -113,6 +148,23 @@ private fun DashboardCard(
         ),
     ) {
         Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
+            if (editMode) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Build,
+                        contentDescription = "Resize",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.height(16.dp),
+                    )
+                    Spacer(Modifier.padding(horizontal = 3.dp))
+                    Text(
+                        text = "tap: ${card.size.name.lowercase()}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+            }
             val range = gaugeRanges[card.key]
             val numeric = card.valueText.toDoubleOrNull()
             if (range != null) {
@@ -124,6 +176,7 @@ private fun DashboardCard(
                         ((it - range.min) / (range.max - range.min)).toFloat()
                     },
                     color = statusColor,
+                    gaugeHeight = gaugeHeight,
                 )
             } else {
                 Text(

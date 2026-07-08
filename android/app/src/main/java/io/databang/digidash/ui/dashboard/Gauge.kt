@@ -6,6 +6,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -37,6 +38,8 @@ fun CircularGauge(
     fraction: Float?, // 0f..1f position on the dial, null = unavailable
     color: Color,
     modifier: Modifier = Modifier,
+    // Fixed gauge height (for wide/large cards); null = square aspect (default).
+    gaugeHeight: androidx.compose.ui.unit.Dp? = null,
 ) {
     val animated by animateFloatAsState(
         targetValue = (fraction ?: 0f).coerceIn(0f, 1f),
@@ -50,7 +53,10 @@ fun CircularGauge(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1.15f),
+                .then(
+                    if (gaugeHeight != null) Modifier.height(gaugeHeight)
+                    else Modifier.aspectRatio(1.15f)
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Canvas(modifier = Modifier.fillMaxSize().padding(8.dp)) {

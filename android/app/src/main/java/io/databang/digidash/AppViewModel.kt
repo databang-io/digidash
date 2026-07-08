@@ -30,6 +30,8 @@ data class AppUiState(
     val identity: EcuIdentity? = null,
     val model: EcuModel? = null,
     val cards: List<DashboardCardState> = emptyList(),
+    /** Dashboard edit mode: long-press a card to resize/reorder. */
+    val dashboardEditMode: Boolean = false,
     /** Latest measurements grouped by measuring block for the Tech screen. */
     val techGroups: List<TechGroup> = emptyList(),
     val dtcCount: Int? = null,
@@ -114,6 +116,21 @@ class AppViewModel(
         container.prefs.getString(AppContainer.PREF_CARD_ORDER, null)
             ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
             ?.takeIf { it.isNotEmpty() }
+
+    /** Persisted per-card size overrides ("key:SIZE,..."). */
+    private val cardSizes: MutableMap<String, io.databang.digidash.domain.model.CardSize> =
+        container.prefs.getString(AppContainer.PREF_CARD_SIZES, null)
+            ?.split(",")?.mapNotNull { entry ->
+                val (k, v) = entry.split(":").let { if (it.size == 2) it[0] to it[1] else return@mapNotNull null }
+                runCatching { k to io.databang.digidash.domain.model.CardSize.valueOf(v) }.getOrNull()
+            }?.toMap()?.toMutableMap() ?: mutableMapOf()
+
+    /** Size for a card: persisted override, else RPM/GPS default to a big gauge. */
+    private fun sizeFor(key: String): io.databang.digidash.domain.model.CardSize =
+        cardSizes[key] ?: when (key) {
+            "rpm", "gps_speed" -> io.databang.digidash.domain.model.CardSize.WIDE
+            else -> io.databang.digidash.domain.model.CardSize.SMALL
+        }
 
     private val _ui = MutableStateFlow(
         AppUiState(
@@ -568,7 +585,7 @@ class AppViewModel(
             )
         }
 
-        val orderedCards = applyCardOrder(cards)
+        val orderedCards = applyCardOrder(cards).map { it.copy(size = sizeFor(it.key)) }
 
         val techGroups = measurements.values
             .groupBy { it.group }
@@ -640,6 +657,22 @@ class AppViewModel(
         cardOrder = keys
         container.prefs.edit().putString(AppContainer.PREF_CARD_ORDER, keys.joinToString(",")).apply()
         _ui.update { it.copy(cards = applyCardOrder(it.cards)) }
+    }
+
+    /** Enter/leave dashboard edit mode (long-press to enter). */
+    fun setDashboardEditMode(on: Boolean) = _ui.update { it.copy(dashboardEditMode = on) }
+
+    /** Cycle a card's size (Small → Wide → Large) and persist. */
+    fun cycleCardSize(key: String) {
+        val next = sizeFor(key).next()
+        cardSizes[key] = next
+        container.prefs.edit().putString(
+            AppContainer.PREF_CARD_SIZES,
+            cardSizes.entries.joinToString(",") { "${it.key}:${it.value.name}" },
+        ).apply()
+        _ui.update { state ->
+            state.copy(cards = state.cards.map { if (it.key == key) it.copy(size = next) else it })
+        }
     }
 
     fun resetCardOrder() {

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -37,6 +38,7 @@ fun ReorderableGaugeGrid(
     onReorder: (List<String>) -> Unit,
     cell: @Composable (DashboardCardState, isDragged: Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onEnterEditMode: () -> Unit = {},
 ) {
     val gridState = rememberLazyGridState()
 
@@ -59,6 +61,8 @@ fun ReorderableGaugeGrid(
             .pointerInput(ordered.map { it.key }) {
                 detectDragGesturesAfterLongPress(
                     onDragStart = { pos ->
+                        // Long-press enters edit mode (resize chips appear).
+                        onEnterEditMode()
                         val item = gridState.itemAt(pos)
                         draggingKey = item?.let { order.getOrNull(it) }
                         dragOffset = Offset.Zero
@@ -95,7 +99,11 @@ fun ReorderableGaugeGrid(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        itemsIndexed(ordered, key = { _, c -> c.key }) { _, card ->
+        itemsIndexed(
+            ordered,
+            key = { _, c -> c.key },
+            span = { _, card -> GridItemSpan(minOf(card.size.cols, maxLineSpan)) },
+        ) { _, card ->
             val isDragged = card.key == draggingKey
             cell(
                 card,
