@@ -54,7 +54,10 @@ class AndroidDongleProvider(private val context: Context) : DongleProvider {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             listOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
         } else {
-            emptyList()
+            // Android <=11 (e.g. Galaxy Tab S3 on Android 9): discovering the
+            // UNPAIRED dongle requires a runtime location grant. (BLUETOOTH /
+            // BLUETOOTH_ADMIN are install-time and already granted.)
+            listOf(Manifest.permission.ACCESS_FINE_LOCATION)
         }
 
     override fun pairedDevices(): List<DongleDevice> {
