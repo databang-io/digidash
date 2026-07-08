@@ -45,10 +45,6 @@
       "offset": 0.0
      },
      "confidence": "low",
-     "display": {
-      "trip_card": true,
-      "order": 25
-     },
      "thresholds": {
       "normal": {
        "min": 12.5,
@@ -489,10 +485,6 @@
       "type": "raw"
      },
      "confidence": "medium",
-     "display": {
-      "trip_card": true,
-      "order": 60
-     },
      "notes": "WOT >= 90°; 0.0° = open circuit to TPS; >=90° at idle = short to + in TPS wiring"
     },
     {
@@ -508,14 +500,18 @@
     },
     {
      "index": 4,
-     "key": "injection_time_g5",
+     "key": "injection_time",
      "name": "Injection time",
      "unit": "ms",
      "value_type": "number",
      "formula": {
       "type": "raw"
      },
-     "confidence": "medium"
+     "confidence": "medium",
+     "display": {
+      "trip_card": true,
+      "order": 45
+     }
     }
    ]
   },
@@ -594,10 +590,6 @@
       "type": "raw"
      },
      "confidence": "low",
-     "display": {
-      "trip_card": true,
-      "order": 70
-     },
      "notes": "Sibling label: varies 30-50 at warm idle, no units; validate on vehicle"
     },
     {
