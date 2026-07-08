@@ -16,12 +16,9 @@
     <uses-permission
         android:name="android.permission.BLUETOOTH_ADMIN"
         android:maxSdkVersion="30" />
-    <!-- Android <=11 (e.g. Galaxy Tab S3 on Android 9): classic discovery of
-         UNPAIRED devices requires a location grant; not needed on 12+ where
-         BLUETOOTH_SCAN is neverForLocation. -->
-    <uses-permission
-        android:name="android.permission.ACCESS_FINE_LOCATION"
-        android:maxSdkVersion="30" />
+    <!-- Location: needed for GPS ground-speed (all versions) and, on Android
+         <=11, for classic discovery of UNPAIRED Bluetooth dongles. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- Android Auto projection -->
     <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />
     <uses-feature

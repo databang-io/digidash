@@ -36,6 +36,7 @@ private data class GaugeRange(val min: Double, val max: Double)
 
 private val gaugeRanges = mapOf(
     "rpm" to GaugeRange(0.0, 7000.0),
+    "gps_speed" to GaugeRange(0.0, 160.0),
     "coolant_temp" to GaugeRange(-20.0, 130.0),
     "coolant_temp_000" to GaugeRange(-20.0, 130.0),
     "battery_voltage" to GaugeRange(8.0, 16.0),

@@ -20,8 +20,8 @@ class FakeDiagnosticClientTest {
         val client = client()
         assertTrue(client.connect(ConnectionConfig()).isSuccess)
         val identity = client.identifyEcu().getOrThrow()
-        assertEquals("037906024AG", identity.partNumberNormalized)
-        assertEquals("DIGIFANT 2E", identity.component)
+        assertEquals("03790602400", identity.partNumberNormalized)
+        assertEquals("DIGIFANT 2E (DEMO)", identity.component)
     }
 
     @Test

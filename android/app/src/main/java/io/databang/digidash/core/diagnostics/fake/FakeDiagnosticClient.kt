@@ -88,13 +88,15 @@ class FakeDiagnosticClient(
         if (failure != null) return failure
         return Result.success(
             EcuIdentity.fromRaw(
-                partNumberRaw = "037 906 024 AG",
-                component = "DIGIFANT 2E",
-                serialNumber = "FAKE-0001",
+                // Distinct DEMO identity so it's obvious this is not a real ECU:
+                // "00" part-number suffix (vs the real "AG") + a zeros VIN.
+                partNumberRaw = "037 906 024 00",
+                component = "DIGIFANT 2E (DEMO)",
+                softwareVersion = "1576",
+                serialNumber = "DEMO-0000000",
                 protocol = "KWP1281",
-                // Demo VIN (T3 format) so the layout is visible; a real 2E
-                // Digifant ECU typically reports no VIN.
-                vin = "WV2ZZZ25ZFH000000",
+                // Obvious placeholder VIN (lots of trailing zeros).
+                vin = "WV2ZZZ25000000000",
             )
         )
     }

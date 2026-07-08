@@ -7,6 +7,7 @@ import io.databang.digidash.core.ecumodel.RemoteEcuModelSource
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Rule
@@ -37,7 +38,9 @@ class EcuModelRepositoryTest {
     fun `index lists the digifant bootstrap model`() = runTest {
         val index = repository.loadIndex()
         assertEquals(1, index.version)
-        assertEquals("037906024AG", index.models.single().ecuPartNumber)
+        // Real 2E model plus the demo alias.
+        assertTrue(index.models.any { it.ecuPartNumber == "037906024AG" })
+        assertTrue(index.models.any { it.ecuPartNumber == "03790602400" })
     }
 
     @Test

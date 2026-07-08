@@ -35,6 +35,8 @@ data class AppUiState(
     val dtcCount: Int? = null,
     val dtcs: List<InterpretedDtc> = emptyList(),
     val dtcBusy: Boolean = false,
+    /** GPS ground speed in km/h (null = no fix / no permission). */
+    val gpsSpeedKmh: Double? = null,
     val ignition: IgnitionState = IgnitionState(),
     val recording: Boolean = false,
     val currentLogFile: String? = null,
@@ -162,6 +164,14 @@ class AppViewModel(
                 rebuildDerivedState(session.measurements.value)
             }
         }
+        viewModelScope.launch {
+            container.gpsSpeedProvider.speedKmh.collect { s ->
+                _ui.update { it.copy(gpsSpeedKmh = s) }
+                rebuildDerivedState(session.measurements.value)
+            }
+        }
+        // Best-effort: starts only if location permission is already granted.
+        container.gpsSpeedProvider.start()
         viewModelScope.launch {
             session.basicSettingsActive.collect { active ->
                 _ui.update { it.copy(ignition = it.ignition.copy(basicSettingsActive = active)) }
@@ -382,6 +392,8 @@ class AppViewModel(
     }
 
     fun refreshDongles() {
+        // Runs after the permission dialog; a good moment to (re)start GPS too.
+        container.gpsSpeedProvider.start()
         val provider = container.dongleProvider
         _ui.update {
             // Keep any unpaired devices found by discovery; refresh the paired set.
@@ -505,6 +517,17 @@ class AppViewModel(
                         },
                     )
                 }
+            )
+            add(
+                state.gpsSpeedKmh?.let {
+                    DashboardCardState(
+                        key = "gps_speed",
+                        title = "GPS speed",
+                        valueText = Math.round(it).toString(),
+                        unit = "km/h",
+                        status = MeasurementStatus.NORMAL,
+                    )
+                } ?: DashboardCardState.unavailable("gps_speed", "GPS speed")
             )
         }
 

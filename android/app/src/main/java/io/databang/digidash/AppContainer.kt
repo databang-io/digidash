@@ -28,6 +28,9 @@ class AppContainer(private val appContext: Context) {
 
     val dongleProvider: DongleProvider = AndroidDongleProvider(appContext)
 
+    /** GPS ground-speed source for the dashboard speed card. */
+    val gpsSpeedProvider = io.databang.digidash.core.location.GpsSpeedProvider(appContext)
+
     val logRepository = LogRepository(appContext)
 
     val alerter = io.databang.digidash.core.alert.Alerter(appContext)

@@ -52,11 +52,16 @@ class AndroidDongleProvider(private val context: Context) : DongleProvider {
 
     override fun requiredPermissions(): List<String> =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            listOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
+            // Location for GPS ground-speed; BT_SCAN is neverForLocation.
+            listOf(
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.ACCESS_FINE_LOCATION,
+            )
         } else {
-            // Android <=11 (e.g. Galaxy Tab S3 on Android 9): discovering the
-            // UNPAIRED dongle requires a runtime location grant. (BLUETOOTH /
-            // BLUETOOTH_ADMIN are install-time and already granted.)
+            // Android <=11 (e.g. Galaxy Tab S3 on Android 9): location grant is
+            // needed both for GPS speed and to discover the UNPAIRED dongle.
+            // (BLUETOOTH / BLUETOOTH_ADMIN are install-time and already granted.)
             listOf(Manifest.permission.ACCESS_FINE_LOCATION)
         }
 
