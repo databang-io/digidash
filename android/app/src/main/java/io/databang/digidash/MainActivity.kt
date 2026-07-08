@@ -133,7 +133,12 @@ fun DigiDashApp(container: AppContainer, sessionHolder: SessionHolder) {
                     connected = state.connected,
                     peaks = state.peaks,
                     onReorder = viewModel::saveCardOrder,
-                    onCardClick = { key -> navController.navigate("detail/$key") },
+                    onCardClick = { key ->
+                        // The DTC summary card jumps to the Faults tab; gauges open
+                        // their detail/history view.
+                        if (key == "dtc_count") navigate(Destination.DTC)
+                        else navController.navigate("detail/$key")
+                    },
                 )
             }
             composable("detail/{key}") { entry ->
