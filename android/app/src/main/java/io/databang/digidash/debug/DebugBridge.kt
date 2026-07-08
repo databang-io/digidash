@@ -81,15 +81,45 @@ class DebugBridge(
                     Log.i(TAG, "raw RX ${resp.size}: ${hex(resp)}")
                 }
                 "scan" -> {
-                    val from = intent.getIntExtra("from", 0)
-                    val to = intent.getIntExtra("to", 15)
-                    for (g in from..to) {
+                    // Sweep measuring groups. Per the KW1281 spec (blafusel), an
+                    // UNSUPPORTED group makes the ECU go silent and requires a
+                    // re-init — so on any failure we reconnect and continue with
+                    // the next group instead of leaving the session wedged. Best
+                    // run with the ENGINE RUNNING (many groups are engine-live).
+                    val from = intent.getIntExtra("from", 1)
+                    val to = intent.getIntExtra("to", 12)
+                    val cfg = ConnectionConfig(
+                        useFakeBackend = false,
+                        dongleAddress = container.prefs.getString(AppContainer.PREF_DONGLE_ADDRESS, null),
+                        dongleName = container.prefs.getString(AppContainer.PREF_DONGLE_NAME, null),
+                    )
+                    val ok = ArrayList<Int>()
+                    var reconnects = 0
+                    val maxReconnects = (to - from) + 6
+                    var g = from
+                    while (g <= to) {
                         val r = client.readMeasuringBlock(g)
-                        Log.i(TAG, "scan $g -> " + r.map { b ->
-                            b.fields.joinToString(" ") { "${it.index}=${it.raw}" }
-                        }.getOrElse { "ERR ${it.asDiagnosticError().userMessage()}" })
+                        if (r.isSuccess) {
+                            val b = r.getOrThrow()
+                            ok.add(g)
+                            Log.i(TAG, "scan $g -> OK " +
+                                b.fields.joinToString(" ") { "${it.index}=${it.raw}" })
+                            g++
+                        } else {
+                            Log.i(TAG, "scan $g -> ERR ${r.exceptionOrNull()?.let {
+                                it.asDiagnosticError().userMessage() } } (unsupported? reconnecting)")
+                            if (reconnects++ >= maxReconnects) {
+                                Log.w(TAG, "scan: reconnect budget exhausted, stopping"); break
+                            }
+                            runCatching { sessionHolder.session.disconnect() }
+                            kotlinx.coroutines.delay(600)
+                            val re = sessionHolder.session.connect(cfg)
+                            Log.i(TAG, "scan: reconnect after group $g -> $re")
+                            if (!re) kotlinx.coroutines.delay(1500)
+                            g++
+                        }
                     }
-                    Log.i(TAG, "scan done")
+                    Log.i(TAG, "scan done — supported groups: $ok (reconnects=$reconnects)")
                 }
                 "poll" -> {
                     val n = intent.getIntExtra("n", 0)
