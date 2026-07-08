@@ -273,17 +273,22 @@ class Kwp1281Session(
     }
 
     fun enterBasicSettings(group: Int): Result<RawMeasuringBlock> = runCatching {
-        // Early Digifant Basic Settings is a param-less start (title 0x11 -> 0xF4).
-        val resp = exchange(Kwp1281Protocol.TITLE_BASIC_SETTING_START, ByteArray(0),
-            terminal = {
-                it.title == Kwp1281Protocol.TITLE_RAW_DATA_RESPONSE ||
-                    it.title == Kwp1281Protocol.TITLE_GROUP_RESPONSE ||
-                    it.title == Kwp1281Protocol.TITLE_NO_DATA
-            })
-        val block = resp.firstOrNull {
-            it.title == Kwp1281Protocol.TITLE_RAW_DATA_RESPONSE ||
-                it.title == Kwp1281Protocol.TITLE_GROUP_RESPONSE
-        } ?: error("no basic-setting response")
+        // Per the official 2E workshop manual: prog level <=1083 uses the ten-zone
+        // group-00 display (param-less title 0x11 -> 0xF4); from level 1390 (ours
+        // is 1576) function 04 takes a display group number -> standard 0x28.
+        val accept = setOf(
+            Kwp1281Protocol.TITLE_RAW_DATA_RESPONSE,
+            Kwp1281Protocol.TITLE_GROUP_RESPONSE,
+            0x02, // legacy raw reply used by this ECU for group reads
+        )
+        val resp = if (group == 0)
+            exchange(Kwp1281Protocol.TITLE_BASIC_SETTING_START, ByteArray(0),
+                terminal = { it.title in accept || it.title == Kwp1281Protocol.TITLE_NO_DATA })
+        else
+            exchange(Kwp1281Protocol.TITLE_BASIC_SETTING, byteArrayOf(group.toByte()),
+                terminal = { it.title in accept || it.title == Kwp1281Protocol.TITLE_NO_DATA })
+        val block = resp.firstOrNull { it.title in accept }
+            ?: error("no basic-setting response")
         RawMeasuringBlock(
             group = group,
             fields = Kwp1281Protocol.decodeGroup(group, block.data),
