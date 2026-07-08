@@ -89,6 +89,12 @@ class DiagnosticSessionRepository(
     @Volatile private var autoReconnect = false
     /** True while a reconnect sweep is in progress. */
     @Volatile private var reconnecting = false
+    /** Reconnect timestamps for the flapping circuit-breaker. */
+    private val recentDrops = ArrayDeque<Long>()
+    /** Groups the ECU refused — skipped in polling so we don't keep killing the
+     *  session (a failed measuring-group request re-inits the KW1281 link). */
+    private val deadGroups = mutableSetOf<Int>()
+    private val groupFailures = mutableMapOf<Int, Int>()
 
     suspend fun connect(config: ConnectionConfig): Boolean {
         lastConfig = config
@@ -97,6 +103,10 @@ class DiagnosticSessionRepository(
         reconnecting = false
         reconnectJob?.cancel()
         reconnectJob = null
+        // Fresh user-initiated connect: give every group another chance.
+        deadGroups.clear()
+        groupFailures.clear()
+        recentDrops.clear()
         return establish(config)
     }
 
@@ -144,6 +154,20 @@ class DiagnosticSessionRepository(
 
     /** Retry [establish] with exponential backoff while the user stays connected. */
     private suspend fun superviseReconnect() {
+        // Flapping circuit-breaker: if drops repeat too fast (e.g. an unsupported
+        // group read that keeps re-initialising the link), pause auto-reconnect
+        // rather than storm the ECU.
+        val now = System.currentTimeMillis()
+        recentDrops.addLast(now)
+        while (recentDrops.isNotEmpty() && now - recentDrops.first() > 30_000L) recentDrops.removeFirst()
+        if (recentDrops.size > 4) {
+            autoReconnect = false
+            reconnecting = false
+            _connectionState.value = ConnectionState.ERROR
+            _lastError.value = DiagnosticError.ProtocolError(
+                "Repeated connection drops — auto-reconnect paused. Reconnect manually.")
+            return
+        }
         var delayMs = 1000L
         var attempt = 0
         while (autoReconnect) {
@@ -263,20 +287,34 @@ class DiagnosticSessionRepository(
                 // While in Basic Settings, read the ignition-advance group every
                 // other cycle so the advance updates fast WITHOUT freezing the
                 // other cards (which would otherwise go stale).
+                // Skip groups the ECU has refused twice — polling them would keep
+                // re-initialising (and dropping) the KW1281 link.
+                val live = tripGroups.filter { it !in deadGroups }
+                if (live.isEmpty()) {
+                    _lastError.value = DiagnosticError.ProtocolError(
+                        "No measuring group answered — group reads unavailable on this ECU")
+                    break
+                }
                 val group = when {
                     _basicSettingsActive.value && i % 2 == 0 -> basicSettingsGroup
-                    else -> tripGroups[(i / if (_basicSettingsActive.value) 2 else 1) % tripGroups.size]
+                    else -> live[(i / if (_basicSettingsActive.value) 2 else 1) % live.size]
                 }
                 i++
                 sessionMutex.withLock {
                     client.readMeasuringBlock(group)
                         .onSuccess { block ->
+                            groupFailures[group] = 0
                             val interpreted = interpreter.interpret(block, model)
                             _measurements.value = _measurements.value +
                                 interpreted.measurements.associateBy { it.key }
                             _lastError.value = null
                         }
-                        .onFailure { _lastError.value = it.asDiagnosticError() }
+                        .onFailure {
+                            _lastError.value = it.asDiagnosticError()
+                            val fails = (groupFailures[group] ?: 0) + 1
+                            groupFailures[group] = fails
+                            if (fails >= 2) deadGroups.add(group)
+                        }
                 }
                 delay(pollIntervalMillis)
             }
