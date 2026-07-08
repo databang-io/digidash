@@ -98,6 +98,7 @@ private fun ConnectionCard(
                 val (label, color) = when (state.connection) {
                     ConnectionState.CONNECTED -> "Connected" to StatusColors.normal
                     ConnectionState.CONNECTING -> "Connecting…" to StatusColors.warning
+                    ConnectionState.RECONNECTING -> "Reconnecting…" to StatusColors.warning
                     ConnectionState.ERROR -> "Error" to StatusColors.critical
                     ConnectionState.DISCONNECTED -> "Disconnected" to StatusColors.unavailable
                 }

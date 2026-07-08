@@ -76,19 +76,48 @@ class DiagnosticSessionRepository(
 
     private var pollJob: Job? = null
     private var stateJob: Job? = null
+    private var reconnectJob: Job? = null
     private val sessionMutex = Mutex()
 
     /** The client resolved for the current/last session. */
     private var client: DiagnosticClient = clientProvider()
 
+    // --- Auto-reconnect state ---
+    /** Config of the current session, replayed on reconnect (same dongle + ECU). */
+    private var lastConfig: ConnectionConfig? = null
+    /** True while the user wants to stay connected (cleared on explicit disconnect). */
+    @Volatile private var autoReconnect = false
+    /** True while a reconnect sweep is in progress. */
+    @Volatile private var reconnecting = false
+
     suspend fun connect(config: ConnectionConfig): Boolean {
+        lastConfig = config
+        // Only auto-reconnect real dongle sessions, never the fake backend.
+        autoReconnect = !config.useFakeBackend
+        reconnecting = false
+        reconnectJob?.cancel()
+        reconnectJob = null
+        return establish(config)
+    }
+
+    /** Connect + identify + resolve model + start polling. Reused on reconnect. */
+    private suspend fun establish(config: ConnectionConfig): Boolean {
         _lastError.value = null
         // Resolve the active backend (fake/real) at connect time and follow its
-        // connection state.
+        // connection state; a drop while [autoReconnect] holds starts a sweep.
         client = clientProvider()
         stateJob?.cancel()
         stateJob = scope.launch {
-            client.connectionState().collect { _connectionState.value = it }
+            client.connectionState().collect { st ->
+                _connectionState.value =
+                    if (reconnecting && st != ConnectionState.CONNECTED) ConnectionState.RECONNECTING else st
+                if (st == ConnectionState.ERROR && autoReconnect && !reconnecting) {
+                    reconnecting = true
+                    _connectionState.value = ConnectionState.RECONNECTING
+                    emit(SessionEvent.ConnectionDropped)
+                    reconnectJob = scope.launch { superviseReconnect() }
+                }
+            }
         }
         val connected = client.connect(config)
         if (connected.isFailure) {
@@ -113,14 +142,45 @@ class DiagnosticSessionRepository(
         return true
     }
 
+    /** Retry [establish] with exponential backoff while the user stays connected. */
+    private suspend fun superviseReconnect() {
+        var delayMs = 1000L
+        var attempt = 0
+        while (autoReconnect) {
+            attempt++
+            _connectionState.value = ConnectionState.RECONNECTING
+            emit(SessionEvent.Reconnecting(attempt))
+            delay(delayMs)
+            if (!autoReconnect) break
+            val cfg = lastConfig ?: break
+            val ok = runCatching { establish(cfg) }.getOrDefault(false)
+            if (ok) {
+                reconnecting = false
+                _connectionState.value = ConnectionState.CONNECTED
+                emit(SessionEvent.Reconnected(attempt))
+                return
+            }
+            delayMs = (delayMs * 2).coerceAtMost(10_000L)
+        }
+        reconnecting = false
+    }
+
     suspend fun disconnect() {
+        // User-initiated: stop auto-reconnect and tear everything down cleanly.
+        autoReconnect = false
+        reconnecting = false
+        reconnectJob?.cancel()
+        reconnectJob = null
         pollJob?.cancel()
         pollJob = null
+        stateJob?.cancel()
+        stateJob = null
         client.disconnect()
         _identity.value = null
         _measurements.value = emptyMap()
         _dtcs.value = emptyList()
         _dtcCount.value = null
+        _connectionState.value = ConnectionState.DISCONNECTED
         emit(SessionEvent.ConnectionLost)
     }
 
@@ -232,6 +292,10 @@ sealed class SessionEvent {
     data class EcuIdentified(val partNumber: String) : SessionEvent()
     data class ModelLoaded(val displayName: String) : SessionEvent()
     data object ConnectionLost : SessionEvent()
+    /** Unexpected drop (socket/ECU) — auto-reconnect is about to start. */
+    data object ConnectionDropped : SessionEvent()
+    data class Reconnecting(val attempt: Int) : SessionEvent()
+    data class Reconnected(val attempt: Int) : SessionEvent()
     data class DtcRead(val count: Int) : SessionEvent()
     data class DtcCleared(val codes: List<String>) : SessionEvent()
     data object BasicSettingsEntered : SessionEvent()
@@ -242,6 +306,9 @@ sealed class SessionEvent {
         is EcuIdentified -> "ECU identified: $partNumber"
         is ModelLoaded -> "ECU model loaded: $displayName"
         ConnectionLost -> "Connection lost"
+        ConnectionDropped -> "Connection dropped — reconnecting"
+        is Reconnecting -> "Reconnecting (attempt $attempt)"
+        is Reconnected -> "Reconnected (after $attempt attempt(s))"
         is DtcRead -> "DTC read: $count fault(s)"
         is DtcCleared -> "DTC cleared: ${codes.joinToString(" ").ifEmpty { "none" }}"
         BasicSettingsEntered -> "Basic Settings entered"

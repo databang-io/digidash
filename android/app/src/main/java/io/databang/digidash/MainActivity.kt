@@ -5,7 +5,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
@@ -216,6 +221,13 @@ fun DigiDashApp(container: AppContainer, sessionHolder: SessionHolder) {
         }
     }
 
+    // Transient popups for connection drop / reconnect, shown on any screen.
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(Unit) {
+        viewModel.toasts.collect { snackbarHostState.showSnackbar(it) }
+    }
+
+    Box(Modifier.fillMaxSize()) {
     if (wide) {
         Row(Modifier.fillMaxSize()) {
             NavigationRail {
@@ -248,5 +260,7 @@ fun DigiDashApp(container: AppContainer, sessionHolder: SessionHolder) {
         ) { padding ->
             content(Modifier.fillMaxSize().padding(padding))
         }
+    }
+    SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
     }
 }

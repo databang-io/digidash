@@ -45,7 +45,11 @@ class Kwp1281Session(
     private val ecuAddress: Int = 0x01,
     private val blockTimeoutMs: Long = 1500,
     private val config: Kwp1281Config = Kwp1281Config(),
+    /** Invoked once if the keep-alive loop ends unexpectedly (socket/ECU drop),
+     *  but NOT on an intentional [close]. Lets the client trigger reconnect. */
+    private val onLost: (() -> Unit)? = null,
 ) {
+    @Volatile private var closing = false
     private var counter = 0
     /** Baud actually used on the wire: the auto-detected rate once init runs. */
     private var activeBaud = baud
@@ -164,6 +168,10 @@ class Kwp1281Session(
                 android.util.Log.i(TAG, "kwp: session loop ended: ${e.message}")
             } finally {
                 running = false
+                if (!closing) {
+                    android.util.Log.i(TAG, "kwp: session lost (unexpected) — notifying")
+                    runCatching { onLost?.invoke() }
+                }
             }
         }.also { it.isDaemon = true; it.name = "kwp1281-session"; it.start() }
     }
@@ -219,6 +227,7 @@ class Kwp1281Session(
     }
 
     fun close() {
+        closing = true
         running = false
         loopThread?.interrupt()
         loopThread = null

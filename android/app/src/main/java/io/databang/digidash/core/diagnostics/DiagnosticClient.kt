@@ -16,7 +16,7 @@ data class ConnectionConfig(
     val dongleName: String? = null,
 )
 
-enum class ConnectionState { DISCONNECTED, CONNECTING, CONNECTED, ERROR }
+enum class ConnectionState { DISCONNECTED, CONNECTING, CONNECTED, ERROR, RECONNECTING }
 
 sealed class DiagnosticError {
     data object DongleNotFound : DiagnosticError()

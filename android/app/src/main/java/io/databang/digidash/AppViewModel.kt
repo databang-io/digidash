@@ -123,9 +123,24 @@ class AppViewModel(
     )
     val ui: StateFlow<AppUiState> = _ui.asStateFlow()
 
+    /** One-shot user-facing messages (connection drop/reconnect) for a Snackbar. */
+    private val _toasts = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 8)
+    val toasts: kotlinx.coroutines.flow.SharedFlow<String> = _toasts
+
     init {
         viewModelScope.launch {
             session.connectionState.collect { state -> _ui.update { it.copy(connection = state) } }
+        }
+        viewModelScope.launch {
+            session.events.collect { ev ->
+                when (ev) {
+                    is io.databang.digidash.data.repository.SessionEvent.ConnectionDropped ->
+                        _toasts.tryEmit("⚠️ Connection lost — reconnecting…")
+                    is io.databang.digidash.data.repository.SessionEvent.Reconnected ->
+                        _toasts.tryEmit("✓ Reconnected")
+                    else -> {}
+                }
+            }
         }
         viewModelScope.launch {
             session.identity.collect { id -> _ui.update { it.copy(identity = id) } }

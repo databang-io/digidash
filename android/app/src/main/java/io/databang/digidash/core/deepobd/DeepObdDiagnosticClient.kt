@@ -83,7 +83,12 @@ class DeepObdDiagnosticClient(
         }
 
         // Live KWP1281 init: 5-baud wake (firmware) + pump the ECU ID blocks.
-        val s = Kwp1281Session(t, baud = kwpBaud, ecuAddress = ecuAddress, config = kwpConfig)
+        // If the keep-alive loop dies (socket/ECU drop), reflect it as ERROR so
+        // the session repository can auto-reconnect without losing the dongle.
+        val s = Kwp1281Session(
+            t, baud = kwpBaud, ecuAddress = ecuAddress, config = kwpConfig,
+            onLost = { if (state.value == ConnectionState.CONNECTED) state.value = ConnectionState.ERROR },
+        )
         val idResult = s.connect()
         if (idResult.isFailure) {
             state.value = ConnectionState.ERROR
