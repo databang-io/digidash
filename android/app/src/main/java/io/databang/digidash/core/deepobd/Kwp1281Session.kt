@@ -143,6 +143,7 @@ class Kwp1281Session(
             var pending: PendingCommand? = null
             val collected = mutableListOf<Block>()
             var misses = 0
+            var pendingBlocks = 0
             try {
             while (running) {
                 // 1. Read the ECU's block (its turn).
@@ -163,21 +164,26 @@ class Kwp1281Session(
                 }
                 misses = 0
                 // 2. Deliver to a waiting command (skipping keep-alive ACKs so an
-                //    ACK-first reply isn't mistaken for the answer).
+                //    ACK-first reply isn't mistaken for the answer). CRITICAL: give
+                //    up after a few blocks if the terminal never matches — else a
+                //    non-answering command (e.g. an unsupported group) stays pending
+                //    forever and the loop never sends the NEXT queued command.
                 if (pending != null) {
+                    pendingBlocks++
                     if (pending.keepAcks || ecuBlock.title != Kwp1281Protocol.TITLE_ACK) {
                         collected.add(ecuBlock)
                     }
-                    if (pending.terminal(ecuBlock)) {
+                    if (pending.terminal(ecuBlock) || pendingBlocks >= 5) {
                         pending.response.offer(collected.toList())
-                        collected.clear(); pending = null
+                        collected.clear(); pending = null; pendingBlocks = 0
                     }
                 }
                 // 3. Host transmits exactly once: a queued command or a keep-alive ACK.
                 if (pending == null) {
                     val next = commandQueue.poll()
                     if (next != null) {
-                        sendBlock(next.title, next.data); pending = next; collected.clear()
+                        sendBlock(next.title, next.data); pending = next
+                        collected.clear(); pendingBlocks = 0
                     } else sendAck()
                 } else {
                     sendAck() // still collecting a multi-block response
@@ -226,19 +232,21 @@ class Kwp1281Session(
         // else a group request gets crossed with an unrelated push.
         val reqTitle: Int
         val reqData: ByteArray
-        val respTitle: Int
+        val accept: Set<Int>
         if (group == 0) {
             reqTitle = Kwp1281Protocol.TITLE_RAW_DATA_REQUEST
             reqData = ByteArray(0)
-            respTitle = Kwp1281Protocol.TITLE_RAW_DATA_RESPONSE
+            accept = setOf(Kwp1281Protocol.TITLE_RAW_DATA_RESPONSE)
         } else {
             reqTitle = Kwp1281Protocol.TITLE_GROUP_REQUEST
             reqData = byteArrayOf(group.toByte())
-            respTitle = Kwp1281Protocol.TITLE_GROUP_RESPONSE
+            // This early Digifant answers a 0x29 group read with the legacy 0x02
+            // block (VCDS-style 0xE7 also accepted for other ECUs).
+            accept = setOf(Kwp1281Protocol.TITLE_GROUP_RESPONSE, 0x02)
         }
         val resp = exchange(reqTitle, reqData,
-            terminal = { it.title == respTitle || it.title == Kwp1281Protocol.TITLE_NO_DATA })
-        val block = resp.firstOrNull { it.title == respTitle }
+            terminal = { it.title in accept || it.title == Kwp1281Protocol.TITLE_NO_DATA })
+        val block = resp.firstOrNull { it.title in accept }
             ?: error("no measuring response for group $group")
         RawMeasuringBlock(
             group = group,
