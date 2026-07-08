@@ -52,6 +52,9 @@ fun ReorderableGaugeGrid(
 
     var draggingKey by remember { mutableStateOf<String?>(null) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    // Distinguish a still long-press (→ enter edit mode) from a drag (→ reorder),
+    // so entering edit mode never recomposes mid-drag and kills the gesture.
+    var moved by remember { mutableStateOf(0f) }
 
     LazyVerticalGrid(
         state = gridState,
@@ -61,8 +64,7 @@ fun ReorderableGaugeGrid(
             .pointerInput(ordered.map { it.key }) {
                 detectDragGesturesAfterLongPress(
                     onDragStart = { pos ->
-                        // Long-press enters edit mode (resize chips appear).
-                        onEnterEditMode()
+                        moved = 0f
                         val item = gridState.itemAt(pos)
                         draggingKey = item?.let { order.getOrNull(it) }
                         dragOffset = Offset.Zero
@@ -70,6 +72,7 @@ fun ReorderableGaugeGrid(
                     onDrag = { change, amount ->
                         change.consume()
                         val key = draggingKey ?: return@detectDragGesturesAfterLongPress
+                        moved += amount.getDistance()
                         dragOffset += amount
                         val fromIndex = order.indexOf(key)
                         val pointer = change.position
@@ -85,13 +88,18 @@ fun ReorderableGaugeGrid(
                         }
                     },
                     onDragEnd = {
-                        draggingKey?.let { onReorder(order) }
+                        // A still long-press (no real movement) enters edit mode;
+                        // an actual drag commits the reorder.
+                        if (moved > 24f) draggingKey?.let { onReorder(order) }
+                        else onEnterEditMode()
                         draggingKey = null
                         dragOffset = Offset.Zero
+                        moved = 0f
                     },
                     onDragCancel = {
                         draggingKey = null
                         dragOffset = Offset.Zero
+                        moved = 0f
                     },
                 )
             },
