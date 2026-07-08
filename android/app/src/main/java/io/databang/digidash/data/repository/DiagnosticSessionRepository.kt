@@ -237,10 +237,11 @@ class DiagnosticSessionRepository(
 
     /** Clear DTCs. Callers must confirm with the user first (safety rule). */
     suspend fun clearDtcs(): Result<Unit> = sessionMutex.withLock {
-        // Preserve current faults in the event log before erasing them.
-        emit(SessionEvent.DtcCleared(_dtcs.value.map { it.code }))
+        // Only log the clear once the ECU actually accepted it.
+        val codes = _dtcs.value.map { it.code }
         client.clearDtc()
             .onSuccess {
+                emit(SessionEvent.DtcCleared(codes))
                 _dtcs.value = emptyList()
                 _dtcCount.value = 0
             }

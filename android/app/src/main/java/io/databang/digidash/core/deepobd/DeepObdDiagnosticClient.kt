@@ -128,13 +128,15 @@ class DeepObdDiagnosticClient(
     }
 
     override suspend fun clearDtc(): Result<Unit> = withContext(Dispatchers.IO) {
-        if (readOnly) return@withContext diagnosticFailure<Unit>(DiagnosticError.UnsupportedFunction)
+        if (readOnly) return@withContext diagnosticFailure<Unit>(
+            DiagnosticError.ProtocolError("Safe (read-only) mode is on — clearing is blocked"))
         val s = session ?: return@withContext diagnosticFailure<Unit>(DiagnosticError.EcuNoResponse)
         s.clearDtc().recover1()
     }
 
     override suspend fun enterBasicSettings(group: Int?): Result<Unit> = withContext(Dispatchers.IO) {
-        if (readOnly) return@withContext diagnosticFailure<Unit>(DiagnosticError.UnsupportedFunction)
+        if (readOnly) return@withContext diagnosticFailure<Unit>(
+            DiagnosticError.ProtocolError("Safe (read-only) mode is on — Basic Settings blocked"))
         val s = session ?: return@withContext diagnosticFailure<Unit>(DiagnosticError.EcuNoResponse)
         s.enterBasicSettings(group ?: 0).map { }.recover1()
     }

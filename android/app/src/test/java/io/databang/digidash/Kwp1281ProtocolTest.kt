@@ -35,6 +35,29 @@ class Kwp1281ProtocolTest {
     }
 
     @Test
+    fun `ignition angle type 4 is signed BTDC`() {
+        // type 4 = (b-127)*a*-0.01 (SIGNED). a=100, b=117 -> (-10)*100*-0.01 = 10.0
+        assertEquals("10", Kwp1281Protocol.decodeGroup(1, byteArrayOf(4, 100.toByte(), 117.toByte()))[0].raw)
+        // a=100, b=137 -> (10)*100*-0.01 = -10.0 (retard past reference)
+        assertEquals("-10", Kwp1281Protocol.decodeGroup(1, byteArrayOf(4, 100.toByte(), 137.toByte()))[0].raw)
+    }
+
+    @Test
+    fun `type 27 idle angle is signed around 128`() {
+        // (b-128)*a*0.01. a=100, b=118 -> -10.0
+        assertEquals("-10", Kwp1281Protocol.decodeGroup(1, byteArrayOf(27, 100.toByte(), 118.toByte()))[0].raw)
+    }
+
+    @Test
+    fun `lambda type 11 and warm-cold type 10`() {
+        // lambda 0.0001*a*(b-128)+1: a=50,b=138 -> 1.05
+        assertEquals("1.05", Kwp1281Protocol.decodeGroup(1, byteArrayOf(11, 50.toByte(), 138.toByte()))[0].raw)
+        // type 10 flag: b!=0 -> WARM
+        assertEquals("WARM", Kwp1281Protocol.decodeGroup(1, byteArrayOf(10, 0, 1))[0].raw)
+        assertEquals("COLD", Kwp1281Protocol.decodeGroup(1, byteArrayOf(10, 0, 0))[0].raw)
+    }
+
+    @Test
     fun `unknown type shows raw a slash b`() {
         val data = byteArrayOf(0x7F, 5.toByte(), 9.toByte())
         val fields = Kwp1281Protocol.decodeGroup(1, data)

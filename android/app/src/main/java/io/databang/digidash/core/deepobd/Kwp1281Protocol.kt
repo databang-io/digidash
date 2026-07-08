@@ -18,6 +18,13 @@ object Kwp1281Protocol {
     const val TITLE_GROUP_REQUEST = 0x29
     const val TITLE_GROUP_RESPONSE = 0xE7
     const val TITLE_BASIC_SETTING = 0x28
+    // Early Digifant (KW1281) uses a param-less raw-display read (group 0) and a
+    // param-less Basic Settings, both answered with title 0xF4 — NOT 0x29/0xE7.
+    const val TITLE_RAW_DATA_REQUEST = 0x12
+    const val TITLE_RAW_DATA_RESPONSE = 0xF4
+    const val TITLE_BASIC_SETTING_START = 0x11
+    /** Titles that carry measuring data (new 0xF4, VAG-COM 0xE7, legacy 0x02 header). */
+    val MEASURING_TITLES = setOf(TITLE_RAW_DATA_RESPONSE, TITLE_GROUP_RESPONSE, 0x02)
     const val TITLE_DTC_REQUEST = 0x07
     const val TITLE_DTC_RESPONSE = 0xFC
     const val TITLE_DTC_CLEAR = 0x05
@@ -43,26 +50,75 @@ object Kwp1281Protocol {
          * types return null so the UI shows raw a/b rather than a fake 0.
          */
         fun value(): Double? = when (type) {
-            0x01 -> 0.2 * a * b                       // rpm
-            0x02 -> 0.002 * a * b                     // %
-            0x03 -> 0.002 * a * b                     // degrees
-            0x04 -> kotlin.math.abs(b - 127) * 0.01 * a // ATDC ignition
-            0x05 -> (b - 100) * 0.1 * a               // temperature °C
-            0x06 -> 0.001 * a * b                     // voltage
-            0x07 -> 0.01 * a * b                      // speed km/h
-            0x08 -> 0.1 * a * b                       // raw scaled
-            0x09 -> (b - 127) * 0.02 * a              // degrees
-            0x0B -> 0.0001 * a * (b - 128) + 1.0      // lambda
-            0x0E -> 0.005 * a * b                     // bar
-            0x0F -> 0.01 * a * b                      // time ms
-            0x12 -> 0.04 * a * b                      // mbar
-            0x15 -> 0.001 * a * b                     // voltage
-            0x16 -> 0.001 * a * b                     // time ms
-            0x17 -> a * b / 256.0                     // %
-            0x1B -> kotlin.math.abs(b - 128) * 0.01 * a // degrees
-            0x21 -> if (a != 0) 100.0 * b / a else 100.0 * b // %
-            0x22 -> (b - 128) * 0.01 * a              // kW
-            0x23 -> 0.01 * a * b                      // l/h
+            1 -> 0.2 * a * b                          // rpm
+            2 -> 0.002 * a * b                        // %
+            3 -> 0.002 * a * b                        // deg
+            4 -> (b - 127) * a * -0.01                // deg BTDC/ATDC (SIGNED)
+            5 -> (b - 100) * 0.1 * a                  // °C
+            6 -> 0.001 * a * b                        // V
+            7 -> 0.01 * a * b                         // km/h
+            8 -> 0.1 * a * b                          // scaled
+            9 -> (b - 127) * 0.02 * a                 // deg
+            // 10 WARM/COLD flag -> handled in display()
+            11 -> 0.0001 * a * (b - 128) + 1.0        // lambda
+            12 -> 0.001 * a * b                       // Ohm
+            13 -> (b - 127) * 0.001 * a               // mm
+            14 -> 0.005 * a * b                       // bar
+            15 -> 0.01 * a * b                        // ms
+            // 16 bitfield, 17 ascii -> raw
+            18 -> 0.04 * a * b                        // mbar
+            19 -> 0.01 * a * b                        // L
+            20 -> (b - 128) * a / 128.0               // %
+            21 -> 0.001 * a * b                       // V
+            22 -> 0.001 * a * b                       // ms
+            23 -> a * b / 256.0                       // %
+            24 -> 0.001 * a * b                       // A
+            25 -> (256 * b + a) / 180.0               // g/s
+            26 -> (b - a).toDouble()                  // °C
+            27 -> (b - 128) * a * 0.01                // deg (SIGNED)
+            28 -> (b - a).toDouble()
+            // 29 flag -> raw
+            30 -> a * b / 12.0                         // deg k/w
+            31 -> a * b / 2560.0                       // °C
+            32 -> (if (b > 128) b - 256 else b).toDouble() // signed8
+            33 -> if (a == 0) 100.0 * b else 100.0 * b / a // %
+            34 -> (b - 128) * a * 0.01                 // deg k/w (idle corr, NOT kW)
+            35 -> 0.01 * a * b                         // l/h
+            36 -> (a * 256 + b) * 10.0                 // km
+            37 -> b.toDouble()
+            38 -> (b - 128) * a * 0.001                // deg k/w
+            39 -> a * b / 255.0                        // mg/h
+            40 -> (a * 255 + b - 4000) * 0.1           // A
+            41 -> (a * 255 + b).toDouble()             // Ah
+            42 -> (a * 255 + b - 4000) * 0.1           // kW
+            43 -> (a * 255 + b) * 0.1                  // V
+            // 44 h:m -> raw
+            45 -> 0.001 * a * b
+            46 -> (a * b - 3200) * 0.0027              // deg k/w
+            47 -> ((b - 128) * a).toDouble()           // ms
+            48 -> (a * 255 + b).toDouble()
+            49 -> a * b * 0.025                         // mg/h
+            50 -> if (a == 0) (b - 128) * 100.0 else (b - 128) * 100.0 / a // mbar
+            51 -> (b - 128) * a / 255.0                 // mg/h
+            52 -> a * (0.02 * b - 1)                    // Nm
+            53 -> (b - 128) * 1.4222 + 0.006 * a        // g/s
+            54 -> (a * 256 + b).toDouble()              // count
+            55 -> 0.005 * a * b                         // s
+            56 -> (a * 256 + b).toDouble()              // WSC
+            57 -> (a * 256 + b + 65536).toDouble()      // WSC
+            58 -> if (b > 128) 1.0225 * (256 - b) else 1.0225 * b // deg
+            59 -> (a * 256 + b) / 32768.0
+            60 -> (a * 256 + b) * 0.01                  // s
+            61 -> if (a == 0) (b - 128).toDouble() else (b - 128) / a.toDouble()
+            62 -> 0.256 * a * b                         // s
+            // 63 ascii -> raw
+            64 -> (a + b).toDouble()                    // Ohm
+            65 -> (b - 127) * 0.01 * a                  // mm
+            66 -> a * b / 511.12                        // V
+            67 -> 640.0 * a + 2.5 * b                   // deg
+            68 -> (256 * a + b) / 7.365                 // deg/s
+            69 -> (256 * a + b) * 0.3254                // bar
+            70 -> (256 * a + b) * 0.192                 // m/s²
             else -> null
         }
     }

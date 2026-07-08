@@ -125,8 +125,10 @@ class Kwp1281Session(
     private class PendingCommand(
         val title: Int,
         val data: ByteArray,
-        /** Collect ECU blocks until an ACK (DTC read) vs a single response block. */
-        val collectUntilAck: Boolean,
+        /** Stop collecting and deliver once this holds for the received block. */
+        val terminal: (Block) -> Boolean,
+        /** Keep ACK (0x09) blocks in the result; else skip keep-alives. */
+        val keepAcks: Boolean = false,
     ) {
         val response = java.util.concurrent.SynchronousQueue<List<Block>>()
     }
@@ -140,16 +142,33 @@ class Kwp1281Session(
         loopThread = Thread {
             var pending: PendingCommand? = null
             val collected = mutableListOf<Block>()
+            var misses = 0
             try {
             while (running) {
                 // 1. Read the ECU's block (its turn).
                 val ecuBlock = readBlock()
-                if (ecuBlock == null) { running = false; break }
-                // 2. Deliver to a waiting command.
+                if (ecuBlock == null) {
+                    // Non-fatal: one silent turn (e.g. an unsupported command like
+                    // a 0x29 this ECU doesn't implement) must NOT kill identity /
+                    // DTC / keep-alive. Fail any pending command promptly, try an
+                    // ACK to recover the turn, and only tear down after several
+                    // consecutive misses (or a real transport exception below).
+                    misses++
+                    if (pending != null) {
+                        pending.response.offer(emptyList()); pending = null; collected.clear()
+                    }
+                    if (misses >= 4) { running = false; break }
+                    runCatching { sendAck() }
+                    continue
+                }
+                misses = 0
+                // 2. Deliver to a waiting command (skipping keep-alive ACKs so an
+                //    ACK-first reply isn't mistaken for the answer).
                 if (pending != null) {
-                    collected.add(ecuBlock)
-                    val done = if (pending.collectUntilAck) ecuBlock.title == Kwp1281Protocol.TITLE_ACK else true
-                    if (done) {
+                    if (pending.keepAcks || ecuBlock.title != Kwp1281Protocol.TITLE_ACK) {
+                        collected.add(ecuBlock)
+                    }
+                    if (pending.terminal(ecuBlock)) {
                         pending.response.offer(collected.toList())
                         collected.clear(); pending = null
                     }
@@ -168,6 +187,13 @@ class Kwp1281Session(
                 android.util.Log.i(TAG, "kwp: session loop ended: ${e.message}")
             } finally {
                 running = false
+                // Fail any pending/queued commands so no exchange() lingers to
+                // its 2.5s timeout (which would hold the session mutex).
+                runCatching { pending?.response?.offer(emptyList()) }
+                while (true) {
+                    val q = commandQueue.poll() ?: break
+                    runCatching { q.response.offer(emptyList()) }
+                }
                 if (!closing) {
                     android.util.Log.i(TAG, "kwp: session lost (unexpected) — notifying")
                     runCatching { onLost?.invoke() }
@@ -176,20 +202,31 @@ class Kwp1281Session(
         }.also { it.isDaemon = true; it.name = "kwp1281-session"; it.start() }
     }
 
-    /** Enqueue a command and wait for its response block(s). */
-    private fun exchange(title: Int, data: ByteArray, collectUntilAck: Boolean = false): List<Block> {
+    /** Enqueue a command and wait for its response block(s). Default: deliver the
+     *  first non-ACK block; the loop delivers an empty list on a silent turn. */
+    private fun exchange(
+        title: Int,
+        data: ByteArray,
+        keepAcks: Boolean = false,
+        terminal: (Block) -> Boolean = { it.title != Kwp1281Protocol.TITLE_ACK },
+    ): List<Block> {
         if (!running) error("session not connected")
-        val cmd = PendingCommand(title, data, collectUntilAck)
+        val cmd = PendingCommand(title, data, terminal, keepAcks)
         commandQueue.offer(cmd)
         return cmd.response.poll(2500, java.util.concurrent.TimeUnit.MILLISECONDS)
             ?: error("no response (session timeout)")
     }
 
     fun readGroup(group: Int): Result<RawMeasuringBlock> = runCatching {
-        val resp = exchange(Kwp1281Protocol.TITLE_GROUP_REQUEST, byteArrayOf(group.toByte()))
-        val block = resp.firstOrNull { it.title == Kwp1281Protocol.TITLE_GROUP_RESPONSE }
-            ?: resp.firstOrNull()
-            ?: error("no group response for $group")
+        // Early Digifant answers a PARAM-LESS raw read (title 0x12 -> 0xF4) for
+        // group 0; numbered groups use the VAG-COM 0x29 -> 0xE7 service.
+        val resp = if (group == 0)
+            exchange(Kwp1281Protocol.TITLE_RAW_DATA_REQUEST, ByteArray(0))
+        else
+            exchange(Kwp1281Protocol.TITLE_GROUP_REQUEST, byteArrayOf(group.toByte()))
+        val block = resp.firstOrNull { it.title in Kwp1281Protocol.MEASURING_TITLES }
+            ?: resp.firstOrNull { it.title != Kwp1281Protocol.TITLE_ACK }
+            ?: error("no measuring response for group $group")
         if (block.title == Kwp1281Protocol.TITLE_NO_DATA) error("group $group not supported")
         RawMeasuringBlock(
             group = group,
@@ -207,13 +244,20 @@ class Kwp1281Session(
     }
 
     fun clearDtc(): Result<Unit> = runCatching {
-        exchange(Kwp1281Protocol.TITLE_DTC_CLEAR, ByteArray(0))
-        Unit
+        // The erase reply is an ACK (0x09) — deliver on any block and require it.
+        val resp = exchange(Kwp1281Protocol.TITLE_DTC_CLEAR, ByteArray(0),
+            keepAcks = true, terminal = { true })
+        if (resp.none { it.title == Kwp1281Protocol.TITLE_ACK }) {
+            error("clear not acknowledged by ECU")
+        }
     }
 
     fun enterBasicSettings(group: Int): Result<RawMeasuringBlock> = runCatching {
-        val resp = exchange(Kwp1281Protocol.TITLE_BASIC_SETTING, byteArrayOf(group.toByte()))
-        val block = resp.firstOrNull() ?: error("no basic-setting response for $group")
+        // Early Digifant Basic Settings is a param-less start (title 0x11 -> 0xF4).
+        val resp = exchange(Kwp1281Protocol.TITLE_BASIC_SETTING_START, ByteArray(0))
+        val block = resp.firstOrNull { it.title in Kwp1281Protocol.MEASURING_TITLES }
+            ?: resp.firstOrNull { it.title != Kwp1281Protocol.TITLE_ACK }
+            ?: error("no basic-setting response")
         RawMeasuringBlock(
             group = group,
             fields = Kwp1281Protocol.decodeGroup(group, block.data),
@@ -222,7 +266,9 @@ class Kwp1281Session(
     }
 
     fun exitBasicSettings(): Result<Unit> = runCatching {
-        exchange(Kwp1281Protocol.TITLE_END_OUTPUT, ByteArray(0))
+        // The end-output reply is an ACK — accept any block.
+        exchange(Kwp1281Protocol.TITLE_END_OUTPUT, ByteArray(0),
+            keepAcks = true, terminal = { true })
         Unit
     }
 
