@@ -131,8 +131,10 @@ fun DigiDashApp(container: AppContainer, sessionHolder: SessionHolder) {
                 DashboardScreen(
                     cards = state.cards,
                     connected = state.connected,
+                    columns = if (LocalConfiguration.current.screenWidthDp >= 600) 4 else 2,
                     peaks = state.peaks,
                     editMode = state.dashboardEditMode,
+                    selectedKey = state.selectedCardKey,
                     onReorder = viewModel::saveCardOrder,
                     onCardClick = { key ->
                         // The DTC summary card jumps to the Faults tab; gauges open
@@ -140,9 +142,11 @@ fun DigiDashApp(container: AppContainer, sessionHolder: SessionHolder) {
                         if (key == "dtc_count") navigate(Destination.DTC)
                         else navController.navigate("detail/$key")
                     },
-                    onCycleSize = viewModel::cycleCardSize,
+                    onSelect = viewModel::selectCard,
+                    onSetSize = viewModel::setCardSize,
                     onEnterEditMode = { viewModel.setDashboardEditMode(true) },
                     onExitEditMode = { viewModel.setDashboardEditMode(false) },
+                    onResetLayout = viewModel::resetDashboardLayout,
                 )
             }
             composable("detail/{key}") { entry ->

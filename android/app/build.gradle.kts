@@ -53,6 +53,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.androidx.car.app)
+    // Reliable drag-to-reorder for LazyGrid (iOS-18-style dashboard editing).
+    implementation("sh.calvin.reorderable:reorderable:2.4.3")
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 

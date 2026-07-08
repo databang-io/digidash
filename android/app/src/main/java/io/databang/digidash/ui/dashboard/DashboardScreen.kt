@@ -1,6 +1,18 @@
 package io.databang.digidash.ui.dashboard
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,20 +20,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.background
-import androidx.compose.material3.Button
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +40,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import io.databang.digidash.domain.model.CardSize
 import io.databang.digidash.domain.model.DashboardCardState
 import io.databang.digidash.domain.model.MeasurementStatus
 import io.databang.digidash.ui.theme.StatusColors
@@ -56,13 +67,17 @@ private val gaugeRanges = mapOf(
 fun DashboardScreen(
     cards: List<DashboardCardState>,
     connected: Boolean,
+    columns: Int = 2,
     peaks: Map<String, io.databang.digidash.core.history.PeakHold> = emptyMap(),
     editMode: Boolean = false,
+    selectedKey: String? = null,
     onReorder: (List<String>) -> Unit = {},
     onCardClick: (String) -> Unit = {},
-    onCycleSize: (String) -> Unit = {},
+    onSelect: (String?) -> Unit = {},
+    onSetSize: (String, CardSize) -> Unit = { _, _ -> },
     onEnterEditMode: () -> Unit = {},
     onExitEditMode: () -> Unit = {},
+    onResetLayout: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (cards.isEmpty() || !connected) {
@@ -98,73 +113,108 @@ fun DashboardScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    "Editing — drag to move · tap a card to resize",
+                    "Editing — drag to move · tap to select & resize",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.weight(1f),
                 )
+                TextButton(onClick = onResetLayout) { Text("Reset") }
+                Spacer(Modifier.padding(horizontal = 2.dp))
                 Button(onClick = onExitEditMode) { Text("Done") }
             }
         }
-        // Adaptive grid; long-press a card to enter edit mode + drag to reorder.
-        ReorderableGaugeGrid(
-            cards = cards,
-            onReorder = onReorder,
-            onEnterEditMode = onEnterEditMode,
-            modifier = Modifier.weight(1f),
-            cell = { card, isDragged ->
-                DashboardCard(card, peaks[card.key], isDragged, editMode) {
-                    if (editMode) onCycleSize(card.key) else onCardClick(card.key)
-                }
-            },
-        )
+        Box(modifier = Modifier.weight(1f)) {
+            if (editMode) GridGuides(columns)
+            ReorderableGaugeGrid(
+                cards = cards,
+                columns = columns,
+                editMode = editMode,
+                onReorder = onReorder,
+                cell = { card, isDragging, dragHandle ->
+                    DashboardCard(
+                        card = card,
+                        peak = peaks[card.key],
+                        isDragging = isDragging,
+                        editMode = editMode,
+                        selected = editMode && card.key == selectedKey,
+                        dragHandle = dragHandle,
+                        onTap = { if (editMode) onSelect(card.key) else onCardClick(card.key) },
+                        onLongPress = onEnterEditMode,
+                        onSetSize = { onSetSize(card.key, it) },
+                    )
+                },
+            )
+        }
     }
 }
 
+/** Faint vertical column guides behind the grid, for alignment while editing. */
+@Composable
+private fun GridGuides(columns: Int) {
+    val color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
+    Canvas(Modifier.fillMaxSize()) {
+        if (columns <= 1) return@Canvas
+        val step = size.width / columns
+        for (i in 1 until columns) {
+            val x = step * i
+            drawLine(color, androidx.compose.ui.geometry.Offset(x, 0f),
+                androidx.compose.ui.geometry.Offset(x, size.height), strokeWidth = 2f)
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DashboardCard(
     card: DashboardCardState,
     peak: io.databang.digidash.core.history.PeakHold? = null,
-    isDragged: Boolean = false,
+    isDragging: Boolean = false,
     editMode: Boolean = false,
-    onClick: () -> Unit = {},
+    selected: Boolean = false,
+    dragHandle: Modifier = Modifier,
+    onTap: () -> Unit = {},
+    onLongPress: () -> Unit = {},
+    onSetSize: (CardSize) -> Unit = {},
 ) {
     val gaugeHeight = when (card.size) {
-        io.databang.digidash.domain.model.CardSize.SMALL -> null
-        io.databang.digidash.domain.model.CardSize.WIDE -> 120.dp
-        io.databang.digidash.domain.model.CardSize.LARGE -> 190.dp
+        CardSize.SMALL -> null
+        CardSize.WIDE -> 120.dp
+        CardSize.LARGE -> 190.dp
     }
     val statusColor = card.statusColor()
-    val elevation = if (isDragged) 12.dp else 0.dp
-    val scale = if (isDragged) 1.06f else 1f
+    val elevation = if (isDragging) 12.dp else 0.dp
+    val scale = if (isDragging) 1.04f else 1f
+
+    // Subtle jiggle while editing (iOS-style), still in run mode.
+    val jiggle = if (editMode && !isDragging) {
+        val t = rememberInfiniteTransition(label = "jiggle")
+        t.animateFloat(
+            initialValue = -0.7f, targetValue = 0.7f,
+            animationSpec = infiniteRepeatable(tween(170), RepeatMode.Reverse),
+            label = "rot",
+        ).value
+    } else 0f
+
+    val border = when {
+        selected -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        else -> null
+    }
+
     Card(
-        onClick = onClick,
-        modifier = Modifier
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .zIndex(if (isDragged) 1f else 0f),
+        modifier = dragHandle
+            .graphicsLayer { scaleX = scale; scaleY = scale; rotationZ = jiggle }
+            .zIndex(if (isDragging) 1f else 0f)
+            .combinedClickable(
+                onClick = onTap,
+                onLongClick = if (editMode) null else onLongPress,
+            ),
         elevation = CardDefaults.cardElevation(defaultElevation = elevation),
+        border = border,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         ),
     ) {
         Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
-            if (editMode) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Build,
-                        contentDescription = "Resize",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.height(16.dp),
-                    )
-                    Spacer(Modifier.padding(horizontal = 3.dp))
-                    Text(
-                        text = "tap: ${card.size.name.lowercase()}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-                Spacer(Modifier.height(4.dp))
-            }
             val range = gaugeRanges[card.key]
             val numeric = card.valueText.toDoubleOrNull()
             if (range != null) {
@@ -190,6 +240,19 @@ private fun DashboardCard(
                     style = MaterialTheme.typography.headlineMedium,
                     color = statusColor,
                 )
+            }
+            // Size control on the selected card (replaces tap-to-cycle).
+            if (selected) {
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    CardSize.entries.forEach { s ->
+                        FilterChip(
+                            selected = card.size == s,
+                            onClick = { onSetSize(s) },
+                            label = { Text(s.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                        )
+                    }
+                }
             }
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {

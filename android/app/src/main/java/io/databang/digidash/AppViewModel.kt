@@ -32,6 +32,8 @@ data class AppUiState(
     val cards: List<DashboardCardState> = emptyList(),
     /** Dashboard edit mode: long-press a card to resize/reorder. */
     val dashboardEditMode: Boolean = false,
+    /** Card selected in edit mode (shows its size control). */
+    val selectedCardKey: String? = null,
     /** Latest measurements grouped by measuring block for the Tech screen. */
     val techGroups: List<TechGroup> = emptyList(),
     val dtcCount: Int? = null,
@@ -659,19 +661,35 @@ class AppViewModel(
         _ui.update { it.copy(cards = applyCardOrder(it.cards)) }
     }
 
-    /** Enter/leave dashboard edit mode (long-press to enter). */
-    fun setDashboardEditMode(on: Boolean) = _ui.update { it.copy(dashboardEditMode = on) }
+    /** Enter/leave dashboard edit mode (long-press to enter); clears selection. */
+    fun setDashboardEditMode(on: Boolean) =
+        _ui.update { it.copy(dashboardEditMode = on, selectedCardKey = if (on) it.selectedCardKey else null) }
 
-    /** Cycle a card's size (Small → Wide → Large) and persist. */
-    fun cycleCardSize(key: String) {
-        val next = sizeFor(key).next()
-        cardSizes[key] = next
+    /** Select a card in edit mode to reveal its size control (null = deselect). */
+    fun selectCard(key: String?) = _ui.update { it.copy(selectedCardKey = key) }
+
+    /** Set a card's size explicitly (from the segmented control) and persist. */
+    fun setCardSize(key: String, size: io.databang.digidash.domain.model.CardSize) {
+        cardSizes[key] = size
         container.prefs.edit().putString(
             AppContainer.PREF_CARD_SIZES,
             cardSizes.entries.joinToString(",") { "${it.key}:${it.value.name}" },
         ).apply()
         _ui.update { state ->
-            state.copy(cards = state.cards.map { if (it.key == key) it.copy(size = next) else it })
+            state.copy(cards = state.cards.map { if (it.key == key) it.copy(size = size) else it })
+        }
+    }
+
+    /** Reset the dashboard layout (order + sizes) to defaults. */
+    fun resetDashboardLayout() {
+        cardOrder = null
+        cardSizes.clear()
+        container.prefs.edit()
+            .remove(AppContainer.PREF_CARD_ORDER)
+            .remove(AppContainer.PREF_CARD_SIZES)
+            .apply()
+        _ui.update { state ->
+            state.copy(cards = applyCardOrder(state.cards).map { it.copy(size = sizeFor(it.key)) })
         }
     }
 
