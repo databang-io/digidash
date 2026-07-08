@@ -37,6 +37,9 @@ data class AppUiState(
     val dtcBusy: Boolean = false,
     /** GPS ground speed in km/h (null = no fix / no permission). */
     val gpsSpeedKmh: Double? = null,
+    val gpsFix: io.databang.digidash.core.location.GpsFix =
+        io.databang.digidash.core.location.GpsFix.NO_PERMISSION,
+    val gpsSatellites: Int = 0,
     val ignition: IgnitionState = IgnitionState(),
     val recording: Boolean = false,
     val currentLogFile: String? = null,
@@ -164,10 +167,33 @@ class AppViewModel(
                 rebuildDerivedState(session.measurements.value)
             }
         }
+        // Unified GPS speed source: the real provider when live, a smooth fake
+        // oscillation in demo mode so the card is populated without a vehicle.
         viewModelScope.launch {
-            container.gpsSpeedProvider.speedKmh.collect { s ->
-                _ui.update { it.copy(gpsSpeedKmh = s) }
-                rebuildDerivedState(session.measurements.value)
+            var tick = 0
+            while (isActive) {
+                val speed: Double? = when {
+                    !_ui.value.connected -> null
+                    container.useRealBackend -> container.gpsSpeedProvider.speedKmh.value
+                    else -> {
+                        // Demo: track the demo RPM (virtual gearing) so speed and
+                        // rpm gauges move together; fall back to a gentle sweep.
+                        val rpm = session.measurements.value.values
+                            .firstOrNull { it.key == "rpm" || it.unit == "rpm" }?.value
+                        rpm?.let { (it / 33.0).coerceIn(0.0, 160.0) }
+                            ?: 48.0 + 42.0 * kotlin.math.sin(tick / 7.0)
+                    }
+                }
+                val fix = if (container.useRealBackend) container.gpsSpeedProvider.fix.value
+                    else io.databang.digidash.core.location.GpsFix.FIX
+                val sats = container.gpsSpeedProvider.satellitesInView.value
+                if (speed != _ui.value.gpsSpeedKmh || fix != _ui.value.gpsFix ||
+                    sats != _ui.value.gpsSatellites) {
+                    _ui.update { it.copy(gpsSpeedKmh = speed, gpsFix = fix, gpsSatellites = sats) }
+                    rebuildDerivedState(session.measurements.value)
+                }
+                tick++
+                kotlinx.coroutines.delay(1000)
             }
         }
         // Best-effort: starts only if location permission is already granted.
@@ -519,15 +545,26 @@ class AppViewModel(
                 }
             )
             add(
-                state.gpsSpeedKmh?.let {
-                    DashboardCardState(
-                        key = "gps_speed",
-                        title = "GPS speed",
-                        valueText = Math.round(it).toString(),
-                        unit = "km/h",
-                        status = MeasurementStatus.NORMAL,
+                when {
+                    state.gpsSpeedKmh != null -> DashboardCardState(
+                        key = "gps_speed", title = "GPS speed",
+                        valueText = Math.round(state.gpsSpeedKmh).toString(),
+                        unit = "km/h", status = MeasurementStatus.NORMAL,
                     )
-                } ?: DashboardCardState.unavailable("gps_speed", "GPS speed")
+                    state.gpsFix == io.databang.digidash.core.location.GpsFix.SEARCHING ->
+                        DashboardCardState(
+                            key = "gps_speed", title = "GPS speed", valueText = "No fix",
+                            unit = if (state.gpsSatellites > 0) "${state.gpsSatellites} sat"
+                            else "searching…",
+                            status = MeasurementStatus.NORMAL,
+                        )
+                    state.gpsFix == io.databang.digidash.core.location.GpsFix.DISABLED ->
+                        DashboardCardState(
+                            key = "gps_speed", title = "GPS speed", valueText = "GPS off",
+                            unit = "", status = MeasurementStatus.NORMAL,
+                        )
+                    else -> DashboardCardState.unavailable("gps_speed", "GPS speed")
+                }
             )
         }
 
