@@ -152,6 +152,11 @@ class DeepObdDiagnosticClient(
     fun adapterInfo(): AdapterInfo? = adapter
 
     /** Debug: send raw bytes straight to the adapter and return the response. */
+    /** Debug: send an arbitrary KW1281 block via the live session, dump all replies. */
+    suspend fun debugBlock(title: Int, data: ByteArray): String = withContext(Dispatchers.IO) {
+        session?.debugExchange(title, data)?.getOrElse { "ERR ${it.message}" } ?: "no session"
+    }
+
     suspend fun debugRaw(bytes: ByteArray, timeoutMs: Long = 1500): ByteArray =
         withContext(Dispatchers.IO) {
             val t = transport ?: return@withContext ByteArray(0)

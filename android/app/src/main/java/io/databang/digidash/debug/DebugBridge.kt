@@ -53,6 +53,12 @@ class DebugBridge(
                     Log.i(TAG, "identify -> " + id.map { "${it.partNumberRaw} / ${it.component}" }
                         .getOrElse { "ERR ${it.asDiagnosticError().userMessage()}" })
                 }
+                "sendblock" -> {
+                    val title = intent.getIntExtra("title", 0x29)
+                    val bytes = parseHex(intent.getStringExtra("data").orEmpty())
+                    Log.i(TAG, "sendblock T=%02X data=[%s]".format(title, hex(bytes)))
+                    Log.i(TAG, "sendblock -> " + client.debugBlock(title, bytes))
+                }
                 "group" -> {
                     val n = intent.getIntExtra("n", 0)
                     val r = client.readMeasuringBlock(n)

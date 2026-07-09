@@ -225,6 +225,20 @@ class Kwp1281Session(
             ?: error("no response (session timeout)")
     }
 
+    /**
+     * Debug: send an arbitrary block and collect EVERYTHING the ECU answers
+     * (ACKs included) until the pending give-up — a protocol sniffer for
+     * probing undocumented request formats live.
+     */
+    fun debugExchange(title: Int, data: ByteArray): Result<String> = runCatching {
+        val blocks = exchange(title, data, keepAcks = true, terminal = { false })
+        blocks.joinToString(" | ") { b ->
+            "T=%02X ctr=%02X [%s]".format(
+                b.title, b.counter,
+                b.data.joinToString(" ") { "%02X".format(it) })
+        }.ifEmpty { "(no blocks)" }
+    }
+
     fun readGroup(group: Int): Result<RawMeasuringBlock> = runCatching {
         // Early Digifant answers a PARAM-LESS raw read (title 0x12 -> 0xF4) for
         // group 0; numbered groups use the VAG-COM 0x29 -> 0xE7 service. Match the
