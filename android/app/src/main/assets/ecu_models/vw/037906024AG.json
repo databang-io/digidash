@@ -10,7 +10,7 @@
  "source": {
   "type": "lbl-inferred",
   "confidence": "high",
-  "notes": "Groups 001-004 zone semantics from the official VW Golf/Vento 2E Digifant workshop manual (ed. 04.1993): prog level >=1390 uses 4 display zones per group; this ECU reports software 1576. The 10-field group 000 matches the manual's <=1083 ten-zone basic-setting display (wire: param-less 0x12 -> 0xF4, 10 bytes, confirmed live). Wire scaling of group 001-004 zones still unvalidated (formula=raw) - capture a VCDS trace to calibrate. Groups 005-010 remain inferred from sibling label 037-906-023. Timing specs: check 4-8 deg BTDC at 2000-2500 rpm, set 6+/-1 deg (distributor); full advance 35-45 deg at 2800 rpm; idle 770-870 rpm; CO 0.2-1.2 %. GROUP 000 CALIBRATED LIVE (2026-07-08): b2 battery x0.1024 (confirmed), b4 rpm=(raw-32)*35 (vs held ~3000), b7 engine-running flag (0x80=off), b8 advance=(raw-42)*0.5 (matches 35-45deg full-advance spec), b1 coolant-candidate raw degC, b9 injection ms. Groups 001-004 wire replies are legacy title-0x02 46-byte blocks with UNKNOWN zone mapping - do not decode them as VAG 3-byte fields (garbage); they read N/A until calibrated via a VCDS trace."
+  "notes": "Groups 001-004 zone semantics from the official VW Golf/Vento 2E Digifant workshop manual (ed. 04.1993): prog level >=1390 uses 4 display zones per group; this ECU reports software 1576. The 10-field group 000 matches the manual's <=1083 ten-zone basic-setting display (wire: param-less 0x12 -> 0xF4, 10 bytes, confirmed live). Wire scaling of group 001-004 zones still unvalidated (formula=raw) - capture a VCDS trace to calibrate. Groups 005-010 remain inferred from sibling label 037-906-023. Timing specs: check 4-8 deg BTDC at 2000-2500 rpm, set 6+/-1 deg (distributor); full advance 35-45 deg at 2800 rpm; idle 770-870 rpm; CO 0.2-1.2 %. GROUP 000 CALIBRATED LIVE (2026-07-08): b2 battery x0.1024 (confirmed), b4 rpm=(raw-32)*35 (vs held ~3000), b7 engine-running flag (0x80=off), b8 advance=(raw-42)*0.5 (matches 35-45deg full-advance spec), b1 coolant-candidate raw degC, b9 injection ms. Groups 001-004 wire replies are legacy title-0x02 46-byte blocks with UNKNOWN zone mapping - do not decode them as VAG 3-byte fields (garbage); they read N/A until calibrated via a VCDS trace. GROUP 000 REWRITTEN from the user label ZIP (sibling 037906023): z1 intake-air raw, z2 CO pot (battery claim removed), z3 coolant INVERTED lower=hotter, z5 O2S lambda raw/128 V (must vary >=14 counts; 56=0.45V rest = probe disconnected), z6/z7 status, z9 injection. 8/10 zones cross-validated against live captures."
  },
  "compatibility": {
   "vehicle_notes": "VW T3 home conversion, engine side 2E, drivetrain side JX (flywheel/clutch/bellhousing/gearbox). Do not assume Golf 3 flywheel timing marks.",
@@ -18,48 +18,50 @@
  },
  "groups": {
   "000": {
-   "label": "Live raw block (0x12->0xF4, 10 bytes) — primary gauge source",
+   "label": "General Engine Data (live 0x12->0xF4 block) — primary gauge source",
    "polling_priority": "trip",
+   "source_note": "Label 037906023 (user ZIP, sibling ECU) zone semantics + live captures 2026-07-08",
    "fields": [
     {
      "index": 1,
-     "key": "coolant_temp",
-     "name": "Coolant temperature",
-     "unit": "°C",
-     "value_type": "number",
-     "formula": {
-      "type": "raw"
-     },
-     "confidence": "medium",
-     "notes": "Calibrated live at the garage 2026-07-08 (idle vs held ~3000 rpm vs engine-off): rose slowly 35->39 during warm-up; raw °C assumed",
-     "critical": true
-    },
-    {
-     "index": 2,
-     "key": "battery_voltage",
-     "name": "Battery voltage",
-     "unit": "V",
-     "value_type": "number",
-     "formula": {
-      "type": "scale_offset",
-      "scale": 0.1024,
-      "offset": 0.0
-     },
-     "confidence": "high",
-     "notes": "Calibrated live at the garage 2026-07-08 (idle vs held ~3000 rpm vs engine-off): 14.9 V alternator running / 13.7 V engine off — confirmed",
-     "critical": true
-    },
-    {
-     "index": 3,
-     "key": "raw_000_3",
-     "name": "Raw byte 3",
+     "key": "intake_air_temp_raw",
+     "name": "Intake air temp (raw)",
      "unit": "",
      "value_type": "number",
      "formula": {
       "type": "raw"
      },
-     "confidence": "low",
-     "notes": "Constant 0x08 in all captures"
+     "confidence": "high",
+     "notes": "Label: 250-255=open circuit, 0=short to V+, 10-190=OK, lower numbers hotter. Live: 38-39, matches label warm-idle 039"
+    },
+    {
+     "index": 2,
+     "key": "co_pot",
+     "name": "CO fuel trim potentiometer",
+     "unit": "",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "high",
+     "notes": "Label: 40-140=OK, 250-255=open circuit, 0-2=short to ground. Live: 132-146 (tracks supply voltage slightly). NOT battery — battery is group 2 zone 3"
+    },
+    {
+     "index": 3,
+     "key": "coolant_temp_raw",
+     "name": "Coolant temp (raw, INVERTED)",
+     "unit": "",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "high",
+     "notes": "Label: LOWER numbers are HOTTER; must decrease smoothly during warm-up. Live confirmed: 49 cold -> 7-12 hot",
+     "critical": true,
+     "display": {
+      "trip_card": true,
+      "order": 21
+     }
     },
     {
      "index": 4,
@@ -73,20 +75,44 @@
       "offset": -1120.0
      },
      "confidence": "medium",
-     "notes": "Calibrated live at the garage 2026-07-08 (idle vs held ~3000 rpm vs engine-off): engine off 0x20->0 rpm; idle ~0x36-0x43; held ~3000 = 0x65-0x73. rpm=(raw-32)*35; refine scale against a real tachometer/VCDS",
-     "critical": true
+     "notes": "Label z4 undocumented (observed 054 warm idle = our 0x36 idle). Live calib: 0x20 engine-off->0, (raw-32)*35 vs held ~3000. Refine scale vs tachometer",
+     "critical": true,
+     "display": {
+      "trip_card": true,
+      "order": 10
+     },
+     "thresholds": {
+      "normal": {
+       "min": 0,
+       "max": 5800
+      },
+      "warning": {
+       "min": 0,
+       "max": 6300
+      },
+      "critical": {
+       "min": 6300
+      }
+     }
     },
     {
      "index": 5,
-     "key": "raw_000_5",
-     "name": "Temperature candidate",
-     "unit": "",
+     "key": "lambda_signal",
+     "name": "Lambda (O2S) voltage",
+     "unit": "V",
      "value_type": "number",
      "formula": {
-      "type": "raw"
+      "type": "scale_offset",
+      "scale": 0.0078125,
+      "offset": 0.0
      },
-     "confidence": "low",
-     "notes": "Near-constant 0x38/0x39 (56-57) — intake air temp candidate"
+     "confidence": "high",
+     "notes": "Label: MUST VARY by at least 14 counts (0.11 V) when active; 164-168=cold sensor or open circuit; 0-5=short to V+. Live: stuck 56-57 = 0.45 V with probe disconnected (= official manual rest voltage). Manual: healthy control fluctuates >0.3 V at warm idle",
+     "critical": true,
+     "display": {
+      "trip_card": true,
+      "order": 60
+     }
     },
     {
      "index": 6,
@@ -97,8 +123,8 @@
      "formula": {
       "type": "raw"
      },
-     "confidence": "low",
-     "notes": "0x20 engine off / 0x00 running / transients during transitions"
+     "confidence": "medium",
+     "notes": "Label observed 000 at warm idle (matches live running=0x00); 0x20 engine off"
     },
     {
      "index": 7,
@@ -110,7 +136,7 @@
       "type": "raw"
      },
      "confidence": "high",
-     "notes": "0x80 = engine stopped, 0x00 = running — confirmed live incl. a stall"
+     "notes": "0x80 = engine stopped, 0x00 = running — confirmed live incl. a stall; label observed 000 at warm idle"
     },
     {
      "index": 8,
@@ -124,7 +150,11 @@
       "offset": -21.0
      },
      "confidence": "medium",
-     "notes": "Calibrated live at the garage 2026-07-08 (idle vs held ~3000 rpm vs engine-off): (raw-42)*0.5 -> ~1-10° idle, 35-40° held 3000 (matches official full-advance spec 35-45° at 2800+), 0° engine off"
+     "notes": "Label z8 observed 048 warm idle = 3 deg by (raw-42)*0.5. Live: 35-40 deg at held 3000 (matches official full-advance 35-45 deg @2800+), ~0 engine off",
+     "display": {
+      "trip_card": true,
+      "order": 80
+     }
     },
     {
      "index": 9,
@@ -136,22 +166,25 @@
       "type": "raw"
      },
      "confidence": "medium",
-     "notes": "Calibrated live at the garage 2026-07-08 (idle vs held ~3000 rpm vs engine-off): 3-5 ms idle, blips to 9 on throttle, 10 preset engine off"
+     "notes": "Label z9 observed 003 warm idle; live 3-5 ms idle, blips on throttle, 10 preset engine off",
+     "display": {
+      "trip_card": true,
+      "order": 45
+     }
     },
     {
      "index": 10,
      "key": "raw_000_10",
-     "name": "Ignition period candidate",
+     "name": "Zone 10 (undocumented)",
      "unit": "",
      "value_type": "number",
      "formula": {
       "type": "raw"
      },
      "confidence": "low",
-     "notes": "0xF0 engine off (clamp), decreases as rpm rises — non-linear, undecoded"
+     "notes": "Label observed 191 warm idle; live 152-215 idle, 0xF0 clamp engine off; decreases as rpm rises"
     }
-   ],
-   "source_note": "Calibrated live at the garage 2026-07-08 (idle vs held ~3000 rpm vs engine-off)"
+   ]
   },
   "001": {
    "label": "Idling check: rpm / coolant / lambda / conditions",
@@ -169,10 +202,6 @@
      },
      "confidence": "high",
      "critical": true,
-     "display": {
-      "trip_card": true,
-      "order": 10
-     },
      "thresholds": {
       "normal": {
        "min": 600,
@@ -228,10 +257,6 @@
       "type": "raw"
      },
      "confidence": "high",
-     "display": {
-      "trip_card": true,
-      "order": 60
-     },
      "notes": "Manual: must fluctuate by more than 0.3 V after 1 min at 2500 rpm; 0.00 V = earth/connector, 0.45 V steady with connector separated = renew probe G39"
     },
     {
@@ -490,11 +515,7 @@
      "formula": {
       "type": "raw"
      },
-     "confidence": "medium",
-     "display": {
-      "trip_card": true,
-      "order": 45
-     }
+     "confidence": "medium"
     }
    ]
   },
@@ -675,10 +696,6 @@
       "type": "raw"
      },
      "confidence": "low",
-     "display": {
-      "trip_card": true,
-      "order": 80
-     },
      "notes": "Spec 6 (4-8) deg BTDC at ~2250 rpm in Basic Settings. ECU-reported only; timing is set mechanically by rotating the distributor. Validate on vehicle."
     }
    ]
