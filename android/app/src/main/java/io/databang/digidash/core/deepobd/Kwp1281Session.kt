@@ -248,6 +248,13 @@ class Kwp1281Session(
             terminal = { it.title in accept || it.title == Kwp1281Protocol.TITLE_NO_DATA })
         val block = resp.firstOrNull { it.title in accept }
             ?: error("no measuring response for group $group")
+        // This ECU answers numbered groups with a legacy title-0x02 46-byte block
+        // whose zone mapping is unknown. Decoding it as VAG 3-byte fields yields
+        // garbage values on real gauges — refuse instead (cards show N/A, rule 8)
+        // and let the poller retire the group. Group 000 (0xF4) is the live source.
+        if (group != 0 && block.title == 0x02) {
+            error("group $group replies legacy 0x02 raw block — zone mapping uncalibrated")
+        }
         RawMeasuringBlock(
             group = group,
             fields = Kwp1281Protocol.decodeGroup(group, block.data),

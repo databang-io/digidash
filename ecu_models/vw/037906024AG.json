@@ -10,7 +10,7 @@
  "source": {
   "type": "lbl-inferred",
   "confidence": "high",
-  "notes": "Groups 001-004 zone semantics from the official VW Golf/Vento 2E Digifant workshop manual (ed. 04.1993): prog level >=1390 uses 4 display zones per group; this ECU reports software 1576. The 10-field group 000 matches the manual's <=1083 ten-zone basic-setting display (wire: param-less 0x12 -> 0xF4, 10 bytes, confirmed live). Wire scaling of group 001-004 zones still unvalidated (formula=raw) - capture a VCDS trace to calibrate. Groups 005-010 remain inferred from sibling label 037-906-023. Timing specs: check 4-8 deg BTDC at 2000-2500 rpm, set 6+/-1 deg (distributor); full advance 35-45 deg at 2800 rpm; idle 770-870 rpm; CO 0.2-1.2 %."
+  "notes": "Groups 001-004 zone semantics from the official VW Golf/Vento 2E Digifant workshop manual (ed. 04.1993): prog level >=1390 uses 4 display zones per group; this ECU reports software 1576. The 10-field group 000 matches the manual's <=1083 ten-zone basic-setting display (wire: param-less 0x12 -> 0xF4, 10 bytes, confirmed live). Wire scaling of group 001-004 zones still unvalidated (formula=raw) - capture a VCDS trace to calibrate. Groups 005-010 remain inferred from sibling label 037-906-023. Timing specs: check 4-8 deg BTDC at 2000-2500 rpm, set 6+/-1 deg (distributor); full advance 35-45 deg at 2800 rpm; idle 770-870 rpm; CO 0.2-1.2 %. GROUP 000 CALIBRATED LIVE (2026-07-08): b2 battery x0.1024 (confirmed), b4 rpm=(raw-32)*35 (vs held ~3000), b7 engine-running flag (0x80=off), b8 advance=(raw-42)*0.5 (matches 35-45deg full-advance spec), b1 coolant-candidate raw degC, b9 injection ms. Groups 001-004 wire replies are legacy title-0x02 46-byte blocks with UNKNOWN zone mapping - do not decode them as VAG 3-byte fields (garbage); they read N/A until calibrated via a VCDS trace."
  },
  "compatibility": {
   "vehicle_notes": "VW T3 home conversion, engine side 2E, drivetrain side JX (flywheel/clutch/bellhousing/gearbox). Do not assume Golf 3 flywheel timing marks.",
@@ -18,25 +18,26 @@
  },
  "groups": {
   "000": {
-   "label": "Primary display (10 raw fields, no type bytes) - gateway to Basic Settings",
+   "label": "Live raw block (0x12->0xF4, 10 bytes) — primary gauge source",
    "polling_priority": "trip",
    "fields": [
     {
      "index": 1,
-     "key": "intake_air_temp_000",
-     "name": "Intake air temp (candidate)",
-     "unit": "",
+     "key": "coolant_temp",
+     "name": "Coolant temperature",
+     "unit": "°C",
      "value_type": "number",
      "formula": {
       "type": "raw"
      },
-     "confidence": "low",
-     "notes": "Non-linear NTC raw 70-160 at idle = 4.5-72degC. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
+     "confidence": "medium",
+     "notes": "Calibrated live at the garage 2026-07-08 (idle vs held ~3000 rpm vs engine-off): rose slowly 35->39 during warm-up; raw °C assumed",
+     "critical": true
     },
     {
      "index": 2,
      "key": "battery_voltage",
-     "name": "Battery voltage (candidate)",
+     "name": "Battery voltage",
      "unit": "V",
      "value_type": "number",
      "formula": {
@@ -44,131 +45,113 @@
       "scale": 0.1024,
       "offset": 0.0
      },
-     "confidence": "low",
-     "thresholds": {
-      "normal": {
-       "min": 12.5,
-       "max": 14.8
-      },
-      "warning": {
-       "min": 11.5,
-       "max": 15.2
-      },
-      "critical": {
-       "max": 11.5
-      }
-     },
-     "notes": "raw 115-161 = 12.0-16.5 V (V ~ raw*0.1024). Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
+     "confidence": "high",
+     "notes": "Calibrated live at the garage 2026-07-08 (idle vs held ~3000 rpm vs engine-off): 14.9 V alternator running / 13.7 V engine off — confirmed",
+     "critical": true
     },
     {
      "index": 3,
-     "key": "coolant_temp_000",
-     "name": "Coolant temp (candidate)",
-     "unit": "°C",
+     "key": "raw_000_3",
+     "name": "Raw byte 3",
+     "unit": "",
      "value_type": "number",
      "formula": {
-      "type": "scale_offset",
-      "scale": 1.0,
-      "offset": -40.0
+      "type": "raw"
      },
      "confidence": "low",
-     "notes": "degC = raw - 40 (exact on 025-ADY). Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
+     "notes": "Constant 0x08 in all captures"
     },
     {
      "index": 4,
-     "key": "engine_load_000",
-     "name": "Engine load (candidate)",
-     "unit": "%",
-     "value_type": "number",
-     "formula": {
-      "type": "scale_offset",
-      "scale": 0.39,
-      "offset": 0.0
-     },
-     "confidence": "low",
-     "notes": "raw 25-55 = 9.75-19.5% at idle. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
-    },
-    {
-     "index": 5,
-     "key": "lambda_voltage",
-     "name": "Lambda sensor voltage (candidate)",
-     "unit": "V",
-     "value_type": "number",
-     "formula": {
-      "type": "scale_offset",
-      "scale": 0.02,
-      "offset": 0.0
-     },
-     "confidence": "low",
-     "notes": "V = raw*0.02; 0-1.10 V. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
-    },
-    {
-     "index": 6,
-     "key": "lambda_learning",
-     "name": "Lambda learning additive (candidate)",
-     "unit": "ms",
-     "value_type": "number",
-     "formula": {
-      "type": "scale_offset",
-      "scale": 0.034,
-      "offset": 0.0
-     },
-     "confidence": "low",
-     "notes": "raw 0-22 = 0-0.75 ms. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
-    },
-    {
-     "index": 7,
-     "key": "operating_bits",
-     "name": "Operating condition bitfield",
-     "unit": "",
-     "value_type": "unknown",
-     "formula": {
-      "type": "raw"
-     },
-     "confidence": "low",
-     "notes": "Bitfield. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
-    },
-    {
-     "index": 8,
-     "key": "throttle_angle_000",
-     "name": "Throttle angle (candidate)",
-     "unit": "°",
-     "value_type": "number",
-     "formula": {
-      "type": "scale_offset",
-      "scale": 0.5,
-      "offset": 0.0
-     },
-     "confidence": "low",
-     "notes": "raw 5-14 = 2.5-6.5deg at idle. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
-    },
-    {
-     "index": 9,
-     "key": "injection_time_000",
-     "name": "Injection time (candidate)",
-     "unit": "ms",
-     "value_type": "number",
-     "formula": {
-      "type": "raw"
-     },
-     "confidence": "low",
-     "notes": "~2-4 ms at warm idle. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
-    },
-    {
-     "index": 10,
-     "key": "rpm_000",
-     "name": "Engine speed (candidate)",
+     "key": "rpm",
+     "name": "Engine speed",
      "unit": "rpm",
      "value_type": "number",
      "formula": {
       "type": "scale_offset",
-      "scale": 32.0,
-      "offset": 0.0
+      "scale": 35.0,
+      "offset": -1120.0
+     },
+     "confidence": "medium",
+     "notes": "Calibrated live at the garage 2026-07-08 (idle vs held ~3000 rpm vs engine-off): engine off 0x20->0 rpm; idle ~0x36-0x43; held ~3000 = 0x65-0x73. rpm=(raw-32)*35; refine scale against a real tachometer/VCDS",
+     "critical": true
+    },
+    {
+     "index": 5,
+     "key": "raw_000_5",
+     "name": "Temperature candidate",
+     "unit": "",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
      },
      "confidence": "low",
-     "notes": "rpm = raw*32 (exact on 025-ADY); raw 23-27 = 736-864 rpm idle. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
+     "notes": "Near-constant 0x38/0x39 (56-57) — intake air temp candidate"
+    },
+    {
+     "index": 6,
+     "key": "status_000_6",
+     "name": "Status byte 6",
+     "unit": "",
+     "value_type": "bitfield",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low",
+     "notes": "0x20 engine off / 0x00 running / transients during transitions"
+    },
+    {
+     "index": 7,
+     "key": "engine_running",
+     "name": "Engine running flag",
+     "unit": "",
+     "value_type": "bitfield",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "high",
+     "notes": "0x80 = engine stopped, 0x00 = running — confirmed live incl. a stall"
+    },
+    {
+     "index": 8,
+     "key": "ignition_advance",
+     "name": "Ignition advance",
+     "unit": "°BTDC",
+     "value_type": "number",
+     "formula": {
+      "type": "scale_offset",
+      "scale": 0.5,
+      "offset": -21.0
+     },
+     "confidence": "medium",
+     "notes": "Calibrated live at the garage 2026-07-08 (idle vs held ~3000 rpm vs engine-off): (raw-42)*0.5 -> ~1-10° idle, 35-40° held 3000 (matches official full-advance spec 35-45° at 2800+), 0° engine off"
+    },
+    {
+     "index": 9,
+     "key": "injection_time",
+     "name": "Injection time",
+     "unit": "ms",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "medium",
+     "notes": "Calibrated live at the garage 2026-07-08 (idle vs held ~3000 rpm vs engine-off): 3-5 ms idle, blips to 9 on throttle, 10 preset engine off"
+    },
+    {
+     "index": 10,
+     "key": "raw_000_10",
+     "name": "Ignition period candidate",
+     "unit": "",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low",
+     "notes": "0xF0 engine off (clamp), decreases as rpm rises — non-linear, undecoded"
     }
-   ]
+   ],
+   "source_note": "Calibrated live at the garage 2026-07-08 (idle vs held ~3000 rpm vs engine-off)"
   },
   "001": {
    "label": "Idling check: rpm / coolant / lambda / conditions",
