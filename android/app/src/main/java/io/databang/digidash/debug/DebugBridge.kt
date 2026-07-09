@@ -38,6 +38,23 @@ class DebugBridge(
         val client = container.deepObdClient
         sessionHolder.scope.launch {
             when (cmd) {
+                "connectbare" -> {
+                    // h4 test precondition: client-direct connect — transport +
+                    // probe + session (ident pump + keep-alive) with NO DTC read,
+                    // NO group polling, NO 0x12, NO FC voltage telegrams.
+                    container.useRealBackend = true
+                    val cfg = ConnectionConfig(
+                        useFakeBackend = false,
+                        dongleAddress = container.prefs.getString(AppContainer.PREF_DONGLE_ADDRESS, null),
+                        dongleName = container.prefs.getString(AppContainer.PREF_DONGLE_NAME, null),
+                    )
+                    val ok = client.connect(cfg)
+                    Log.i(TAG, "connectbare -> ${ok.isSuccess}; id=${client.debugIdBlocks()}")
+                }
+                "disconnectbare" -> {
+                    client.disconnect()
+                    Log.i(TAG, "disconnectbare done")
+                }
                 "connect" -> {
                     container.useRealBackend = true
                     val cfg = ConnectionConfig(
@@ -175,7 +192,7 @@ class DebugBridge(
                     Log.i(TAG, "dongle set to $name $mac")
                 }
                 "blescan" -> runBleScan(context)
-                "voltage" -> Log.i(TAG, "voltage -> ${client.debugVoltage()} V")
+                "voltage" -> Log.i(TAG, "voltage -> ${client.adapterVoltage() ?: client.debugVoltage()} V")
                 "id" -> Log.i(TAG, "id blocks -> ${client.debugIdBlocks()}")
                 "adapter" -> Log.i(TAG, "adapter -> ${client.adapterInfo()}")
                 "set" -> {

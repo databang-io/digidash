@@ -134,6 +134,8 @@ class Kwp1281Session(
         val terminal: (Block) -> Boolean,
         /** Keep ACK (0x09) blocks in the result; else skip keep-alives. */
         val keepAcks: Boolean = false,
+        /** Blocks to collect before giving up on a non-matching reply. */
+        val giveUpBlocks: Int = 5,
     ) {
         val response = java.util.concurrent.SynchronousQueue<List<Block>>()
     }
@@ -178,7 +180,7 @@ class Kwp1281Session(
                     if (pending.keepAcks || ecuBlock.title != Kwp1281Protocol.TITLE_ACK) {
                         collected.add(ecuBlock)
                     }
-                    if (pending.terminal(ecuBlock) || pendingBlocks >= 5) {
+                    if (pending.terminal(ecuBlock) || pendingBlocks >= pending.giveUpBlocks) {
                         pending.response.offer(collected.toList())
                         collected.clear(); pending = null; pendingBlocks = 0
                     }
@@ -235,9 +237,10 @@ class Kwp1281Session(
         data: ByteArray,
         keepAcks: Boolean = false,
         terminal: (Block) -> Boolean = { it.title != Kwp1281Protocol.TITLE_ACK },
+        giveUpBlocks: Int = 5,
     ): List<Block> {
         if (!running) error("session not connected")
-        val cmd = PendingCommand(title, data, terminal, keepAcks)
+        val cmd = PendingCommand(title, data, terminal, keepAcks, giveUpBlocks)
         commandQueue.offer(cmd)
         // Generous: at ~1200 baud a reply can queue behind a slow spontaneous
         // block read; the loop delivers an empty list promptly on a real miss.
@@ -285,7 +288,11 @@ class Kwp1281Session(
             }
             // Not group data: com-error resync (0x00, counter reset) then retry.
             runCatching {
-                exchange(0x00, ByteArray(0), keepAcks = true, terminal = { true })
+                // Full ident pump: the ECU replays its F6 blocks after a 0x00
+                // sync — collect until its trailing ACK so the retried 0x29
+                // never lands mid-replay.
+                exchange(0x00, ByteArray(0), keepAcks = true,
+                    terminal = { it.title == Kwp1281Protocol.TITLE_ACK }, giveUpBlocks = 8)
             }
             log.append("resync; ")
         }
@@ -299,7 +306,7 @@ class Kwp1281Session(
      * probing undocumented request formats live.
      */
     fun debugExchange(title: Int, data: ByteArray): Result<String> = runCatching {
-        val blocks = exchange(title, data, keepAcks = true, terminal = { false })
+        val blocks = exchange(title, data, keepAcks = true, terminal = { false }, giveUpBlocks = 8)
         blocks.joinToString(" | ") { b ->
             "T=%02X ctr=%02X [%s]".format(
                 b.title, b.counter,
@@ -327,19 +334,28 @@ class Kwp1281Session(
             accept = setOf(Kwp1281Protocol.TITLE_GROUP_RESPONSE, 0x02)
         }
         val resp = exchange(reqTitle, reqData,
-            terminal = { it.title in accept || it.title == Kwp1281Protocol.TITLE_NO_DATA })
-        val block = resp.firstOrNull { it.title in accept }
+            terminal = { it.title in accept || it.title == Kwp1281Protocol.TITLE_NO_DATA ||
+                (group != 0 && it.data.size == 12) })
+        // A typed 4-triplet reply (12 data bytes) is valid measuring data
+        // REGARDLESS of its title (KaPoder 1200-baud rule) — old firmwares
+        // answer with non-standard titles.
+        val typed = resp.firstOrNull {
+            it.title == Kwp1281Protocol.TITLE_GROUP_RESPONSE || (group != 0 && it.data.size == 12)
+        }
+        val block = typed ?: resp.firstOrNull { it.title in accept }
             ?: error("no measuring response for group $group")
         // This ECU answers numbered groups with a legacy title-0x02 46-byte block
         // whose zone mapping is unknown. Decoding it as VAG 3-byte fields yields
         // garbage values on real gauges — refuse instead (cards show N/A, rule 8)
         // and let the poller retire the group. Group 000 (0xF4) is the live source.
-        if (group != 0 && block.title == 0x02) {
+        if (typed == null && group != 0 && block.title == 0x02) {
             error("group $group replies legacy 0x02 raw block — zone mapping uncalibrated")
         }
         RawMeasuringBlock(
             group = group,
-            fields = Kwp1281Protocol.decodeGroup(group, block.data),
+            fields = if (typed != null && group != 0)
+                Kwp1281Protocol.decodeGroupResponse(block.data)
+            else Kwp1281Protocol.decodeGroup(group, block.data),
             timestampMillis = System.currentTimeMillis(),
         )
     }
@@ -429,8 +445,17 @@ class Kwp1281Session(
         // them, or the odd count shifts the (data,status) pairing of the next
         // block and we read status bytes as data.
         if (config.depair == "on" && payload.size > 1) {
-            val echo = readExact(payload.size - 1, 300)
-            android.util.Log.i(TAG, "kwp: drained ack echo ${hexOf(echo)}")
+            val budget = maxOf(300L, (payload.size - 1) * (if (activeBaud <= 4800) 80L else 20L))
+            val echo = readExact(payload.size - 1, budget)
+            // Each echo byte must be the complement of the corresponding sent
+            // byte — validate so a drift is visible in captures.
+            var valid = 0
+            for (i in echo.indices) {
+                if (i < payload.size &&
+                    (echo[i].toInt() and 0xFF) == (payload[i].toInt().inv() and 0xFF)) valid++
+            }
+            android.util.Log.i(TAG,
+                "kwp: drained echo ${echo.size}/${payload.size - 1} complement-valid=$valid [${hexOf(echo)}]")
         }
     }
 
