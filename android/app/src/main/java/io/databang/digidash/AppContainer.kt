@@ -26,6 +26,13 @@ class AppContainer(private val appContext: Context) {
     val prefs: SharedPreferences =
         appContext.getSharedPreferences("digidash", Context.MODE_PRIVATE)
 
+    /** Pin the process while a real session runs (OEM kill protection). */
+    fun startSessionService() =
+        io.databang.digidash.core.diagnostics.SessionForegroundService.start(appContext)
+
+    fun stopSessionService() =
+        io.databang.digidash.core.diagnostics.SessionForegroundService.stop(appContext)
+
     val dongleProvider: DongleProvider = AndroidDongleProvider(appContext)
 
     /** GPS ground-speed source for the dashboard speed card. */

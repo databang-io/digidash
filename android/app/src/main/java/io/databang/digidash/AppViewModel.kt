@@ -261,6 +261,8 @@ class AppViewModel(
                     dongleName = state.selectedDongle?.name,
                 )
             )
+            // Keep the process alive on OEM power management while connected.
+            if (container.useRealBackend) runCatching { container.startSessionService() }
             _ui.update { it.copy(connecting = false) }
         }
     }
@@ -269,6 +271,7 @@ class AppViewModel(
         viewModelScope.launch {
             tripLog.stop()
             session.disconnect()
+            runCatching { container.stopSessionService() }
         }
     }
 
