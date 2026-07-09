@@ -152,6 +152,16 @@ class DeepObdDiagnosticClient(
     fun adapterInfo(): AdapterInfo? = adapter
 
     /** Debug: send raw bytes straight to the adapter and return the response. */
+    /** Battery voltage from the adapter's FC telegram, via the session loop. */
+    suspend fun adapterVoltage(): Double? = withContext(Dispatchers.IO) {
+        session?.readAdapterVoltage()?.getOrNull()
+    }
+
+    /** Debug: KaPoder-style group read with 0x00 resync between attempts. */
+    suspend fun debugGroupResync(group: Int): String = withContext(Dispatchers.IO) {
+        session?.readGroupResync(group)?.getOrElse { "ERR ${it.message}" } ?: "no session"
+    }
+
     /** Debug: send an arbitrary KW1281 block via the live session, dump all replies. */
     suspend fun debugBlock(title: Int, data: ByteArray): String = withContext(Dispatchers.IO) {
         session?.debugExchange(title, data)?.getOrElse { "ERR ${it.message}" } ?: "no session"

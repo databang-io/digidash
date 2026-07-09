@@ -316,6 +316,30 @@ class DiagnosticSessionRepository(
                             groupFailures[group] = fails
                             if (fails >= 2) deadGroups.add(group)
                         }
+                    // Battery from the ADAPTER's own FC voltage telegram (same
+                    // 12V rail as the OBD socket) — this ECU exposes no live
+                    // battery zone we can decode yet.
+                    if (i % 6 == 0) {
+                        (client as? io.databang.digidash.core.deepobd.DeepObdDiagnosticClient)
+                            ?.adapterVoltage()?.let { volts ->
+                                val status = when {
+                                    volts < 10.5 -> io.databang.digidash.domain.model.MeasurementStatus.CRITICAL
+                                    volts < 11.5 || volts > 15.5 -> io.databang.digidash.domain.model.MeasurementStatus.WARNING
+                                    else -> io.databang.digidash.domain.model.MeasurementStatus.NORMAL
+                                }
+                                val m = InterpretedMeasurement(
+                                    key = "battery_voltage",
+                                    name = "Battery voltage (adapter)",
+                                    group = 0, fieldIndex = 0,
+                                    rawString = null, value = volts,
+                                    displayValue = String.format(java.util.Locale.US, "%.1f", volts),
+                                    unit = "V", status = status,
+                                    confidence = "high",
+                                    timestampMillis = System.currentTimeMillis(),
+                                )
+                                _measurements.value = _measurements.value + (m.key to m)
+                            }
+                    }
                 }
                 delay(pollIntervalMillis)
             }

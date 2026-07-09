@@ -60,6 +60,11 @@ class Kwp1281Session(
 
     data class Block(val counter: Int, val title: Int, val data: ByteArray)
 
+    companion object {
+        /** Pseudo-title for adapter-local telegrams handled inside the loop. */
+        const val TITLE_ADAPTER_VOLTAGE = -1
+    }
+
     /** 5-baud init + key-byte handshake + pump identification blocks. */
     fun connect(): Result<List<String>> = runCatching {
         // KWP1281 requires ~2600 ms of K-line idle before the 5-baud wake.
@@ -182,8 +187,23 @@ class Kwp1281Session(
                 if (pending == null) {
                     val next = commandQueue.poll()
                     if (next != null) {
-                        sendBlock(next.title, next.data); pending = next
-                        collected.clear(); pendingBlocks = 0
+                        if (next.title == TITLE_ADAPTER_VOLTAGE) {
+                            // Adapter-local telegram (never reaches the ECU): the
+                            // loop owns the transport, so run it between blocks
+                            // and keep the ECU alive with a normal ACK after.
+                            val raw = runCatching {
+                                transport.write(AdapterProtocol.READ_VOLTAGE)
+                                val r = transport.read(64, 800)
+                                if (r.size < 6) null else (r[r.size - 2].toInt() and 0xFF)
+                            }.getOrNull()
+                            next.response.offer(
+                                if (raw == null) emptyList()
+                                else listOf(Block(0, TITLE_ADAPTER_VOLTAGE, byteArrayOf(raw.toByte()))))
+                            sendAck()
+                        } else {
+                            sendBlock(next.title, next.data); pending = next
+                            collected.clear(); pendingBlocks = 0
+                        }
                     } else sendAck()
                 } else {
                     sendAck() // still collecting a multi-block response
@@ -223,6 +243,54 @@ class Kwp1281Session(
         // block read; the loop delivers an empty list promptly on a real miss.
         return cmd.response.poll(5000, java.util.concurrent.TimeUnit.MILLISECONDS)
             ?: error("no response (session timeout)")
+    }
+
+    /**
+     * Battery voltage measured by the ADAPTER itself (FC status telegram,
+     * x0.1 V) — same 12 V rail as the OBD socket. Executed inside the session
+     * loop between blocks, so it never races the ECU exchange.
+     */
+    fun readAdapterVoltage(): Result<Double> = runCatching {
+        val resp = exchange(TITLE_ADAPTER_VOLTAGE, ByteArray(0),
+            keepAcks = true, terminal = { true })
+        val b = resp.firstOrNull { it.title == TITLE_ADAPTER_VOLTAGE }
+            ?: error("no adapter voltage reply")
+        (b.data[0].toInt() and 0xFF) * 0.1
+    }
+
+    /**
+     * KaPoder-style group read with com-error resync: request the group; if the
+     * reply is not a 4-triplet block (12 data bytes — accepted regardless of
+     * title, per the 1200-baud trial-and-error finding), send a 0x00 sync block
+     * (resets the counter) and retry. Old 1200-baud ECUs interleave a static
+     * 46-byte 0x02 table; the resync is what shakes the real group data loose.
+     */
+    fun readGroupResync(group: Int, attempts: Int = 4): Result<String> = runCatching {
+        val log = StringBuilder()
+        repeat(attempts) { attempt ->
+            val resp = exchange(Kwp1281Protocol.TITLE_GROUP_REQUEST,
+                byteArrayOf(group.toByte()),
+                terminal = { it.title != Kwp1281Protocol.TITLE_ACK })
+            val first = resp.firstOrNull { it.title != Kwp1281Protocol.TITLE_ACK }
+            log.append("try$attempt: ")
+            if (first == null) { log.append("no reply; ") }
+            else {
+                log.append("T=%02X len=%d [%s]; ".format(first.title, first.data.size,
+                    first.data.joinToString(" ") { "%02X".format(it) }))
+                if (first.data.size == 12 || first.title == Kwp1281Protocol.TITLE_GROUP_RESPONSE) {
+                    val fields = Kwp1281Protocol.decodeGroupResponse(first.data)
+                    log.append("DECODED: " + fields.joinToString(" ") { "${it.index}=${it.raw}" })
+                    return@runCatching log.toString()
+                }
+            }
+            // Not group data: com-error resync (0x00, counter reset) then retry.
+            runCatching {
+                exchange(0x00, ByteArray(0), keepAcks = true, terminal = { true })
+            }
+            log.append("resync; ")
+        }
+        log.append("FAILED after $attempts attempts")
+        log.toString()
     }
 
     /**
@@ -344,6 +412,11 @@ class Kwp1281Session(
                 it[2] = title.toByte()
                 data.copyInto(it, 3)
                 it[it.size - 1] = 0x03
+            }.also {
+                // KaPoder com-error recovery: a 0x00 sync block resets the block
+                // counter to 0 after transmission; the next RX re-adopts the
+                // ECU's counter (readBlock always does).
+                if (title == 0x00) counter = 0
             }
         } else {
             // Firmware frames the block; we send just the title + data.

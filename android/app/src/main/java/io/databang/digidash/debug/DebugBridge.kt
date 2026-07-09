@@ -53,6 +53,10 @@ class DebugBridge(
                     Log.i(TAG, "identify -> " + id.map { "${it.partNumberRaw} / ${it.component}" }
                         .getOrElse { "ERR ${it.asDiagnosticError().userMessage()}" })
                 }
+                "groupsync" -> {
+                    val n = intent.getIntExtra("n", 1)
+                    Log.i(TAG, "groupsync $n -> " + client.debugGroupResync(n))
+                }
                 "sendblock" -> {
                     val title = intent.getIntExtra("title", 0x29)
                     val bytes = parseHex(intent.getStringExtra("data").orEmpty())
