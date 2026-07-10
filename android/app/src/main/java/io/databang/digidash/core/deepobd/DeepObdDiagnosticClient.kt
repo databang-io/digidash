@@ -179,6 +179,14 @@ class DeepObdDiagnosticClient(
             else Kwp1281Session.StreamSpec(groups, basicSettings = basicSettings))
     }
 
+    /** Debug: tap RAW stream frames (group, title, data) for offline capture. */
+    fun setStreamRawTap(tap: ((Int, Int, ByteArray) -> Unit)?) {
+        session?.onStreamRaw = if (tap == null) null else { g, b -> tap(g, b.title, b.data) }
+    }
+
+    /** The ECU identity ASCII blocks captured at connect (for the dump header). */
+    fun idBlocks(): List<String> = debugIdBlocks()
+
     /** Debug: KaPoder-style group read with 0x00 resync between attempts. */
     suspend fun debugGroupResync(group: Int): String = withContext(Dispatchers.IO) {
         session?.readGroupResync(group)?.getOrElse { "ERR ${it.message}" } ?: "no session"

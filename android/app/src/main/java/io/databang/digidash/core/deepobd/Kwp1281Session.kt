@@ -166,6 +166,9 @@ class Kwp1281Session(
     @Volatile var onMeasureBlock: ((RawMeasuringBlock) -> Unit)? = null
     /** Emitted when a group is refused/undecodable (repository retires it). */
     @Volatile var onGroupFailure: ((Int) -> Unit)? = null
+    /** RAW stream response tap (group, block) for offline capture — fires for
+     *  EVERY stream reply (0x02 header, 0xF4 body, 0x0A refuse) before decode. */
+    @Volatile var onStreamRaw: ((Int, Block) -> Unit)? = null
 
     private enum class Latch { RESET, ARMED, STREAMING }
     private var latch = Latch.RESET
@@ -218,6 +221,7 @@ class Kwp1281Session(
     private fun handleStreamBlock(spec: StreamSpec, b: Block) {
         awaitingStream = false
         val g = spec.groups[streamIdx % spec.groups.size]
+        onStreamRaw?.invoke(g, b)  // raw capture BEFORE any decode
         fun advance() {
             streamIdx++
             bodiesLeft = spec.dwellBodies

@@ -9,6 +9,7 @@ import io.databang.digidash.SessionHolder
 import io.databang.digidash.core.deepobd.DeepObdDiagnosticClient
 import io.databang.digidash.core.diagnostics.ConnectionConfig
 import io.databang.digidash.core.diagnostics.asDiagnosticError
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -38,6 +39,40 @@ class DebugBridge(
         val client = container.deepObdClient
         sessionHolder.scope.launch {
             when (cmd) {
+                "dumpgroups" -> {
+                    // Capture REAL raw group frames (0x02 headers + 0xF4 bodies)
+                    // to a pullable file for offline work. Connect first.
+                    //   --es groups "0,1,2,3"  --ei seconds 30
+                    //   adb pull <printed path>
+                    if (!client.isTransportOpen()) {
+                        Log.w(TAG, "dumpgroups: NOT connected — run connect first"); return@launch
+                    }
+                    val groups = intent.getStringExtra("groups")
+                        ?.split(",")?.mapNotNull { it.trim().toIntOrNull() }
+                        ?: listOf(0, 1, 2, 3)
+                    val seconds = intent.getIntExtra("seconds", 30)
+                    val dir = java.io.File(context.getExternalFilesDir(null), "dumps").apply { mkdirs() }
+                    val file = java.io.File(dir, "kwp-dump-${System.currentTimeMillis()}.txt")
+                    val w = file.bufferedWriter()
+                    val lock = Any()
+                    fun line(s: String) { synchronized(lock) { w.appendLine(s); w.flush() }; Log.i(TAG, s) }
+                    line("# DigiDash KWP1281 raw group dump")
+                    line("# ecu=${client.idBlocks()}")
+                    line("# groups=$groups seconds=$seconds")
+                    line("# each line: group <g> T=<title> [<data hex>]  (02=header, F4=body, 0A=refused)")
+                    client.setStreamRawTap { g, title, data ->
+                        line("group %d T=%02X [%s]".format(g, title,
+                            data.joinToString(" ") { "%02X".format(it.toInt() and 0xFF) }))
+                    }
+                    client.configureMeasureStream(groups)
+                    Log.i(TAG, "dumpgroups: capturing $groups for ${seconds}s -> ${file.absolutePath}")
+                    kotlinx.coroutines.delay(seconds * 1000L)
+                    client.configureMeasureStream(emptyList())
+                    client.setStreamRawTap(null)
+                    synchronized(lock) { w.close() }
+                    Log.i(TAG, "dumpgroups DONE -> ${file.absolutePath}")
+                    Log.i(TAG, "pull: adb pull ${file.absolutePath}")
+                }
                 "demo" -> {
                     // Switch to the fake backend and connect (desk testing).
                     container.useRealBackend = false
