@@ -98,16 +98,14 @@
     {
      "index": 5,
      "key": "lambda_signal",
-     "name": "Lambda (O2S) voltage",
-     "unit": "V",
+     "name": "Lambda (O2S) raw",
+     "unit": "",
      "value_type": "number",
      "formula": {
-      "type": "scale_offset",
-      "scale": 0.0078125,
-      "offset": 0.0
+      "type": "raw"
      },
-     "confidence": "high",
-     "notes": "Label: MUST VARY by at least 14 counts (0.11 V) when active; 164-168=cold sensor or open circuit; 0-5=short to V+. Live: stuck 56-57 = 0.45 V with probe disconnected (= official manual rest voltage). Manual: healthy control fluctuates >0.3 V at warm idle",
+     "confidence": "medium",
+     "notes": "Label 037906023 z5: O2S — MUST VARY by >=14 counts when active (scale-free oscillation criterion); 164-168 = cold sensor or open circuit per that label. Live on 024AG: stuck 56-57 with probe disconnected — voltage SCALE UNKNOWN (56/128=0.44V matched the manual rest voltage but conflicts with the label open-circuit spec AND the car own VCDS zone-3 reading of 1.22V; do not trust any volts conversion until calibrated with a connected probe + multimeter). Diag: watch for oscillation, not absolute value.",
      "critical": true,
      "display": {
       "trip_card": true,
