@@ -543,15 +543,12 @@ class Kwp1281Session(
     }
 
     fun readDtc(): Result<List<RawDtc>> = runCatching {
-        // SOURCED (gmenounos KW1281Dialog.cs:357-375, klinelib cpp:582-670):
-        // faults may span several 0xFC blocks; collect until the terminating
-        // ACK (each 0xFC is ACKed by the loop's keep-alive turn). The give-up
-        // path still delivers whatever was collected, so an ECU that never
-        // sends the trailing ACK (seen live) cannot regress to zero faults.
-        val resp = exchange(Kwp1281Protocol.TITLE_DTC_REQUEST, ByteArray(0),
-            keepAcks = true,
-            terminal = { it.title == Kwp1281Protocol.TITLE_ACK || it.title == Kwp1281Protocol.TITLE_NO_DATA },
-            giveUpBlocks = 8)
+        // USER-LOCKED (confirmed twice): this read WORKS live on this ECU —
+        // all codes arrive in a single 0xFC block and the trailing ACK may
+        // never come. Deliver on the first response; do NOT change to the
+        // loop-until-ACK pattern without an explicit user go (see
+        // docs/Audit-Fix-Plan.md item 4, deferred).
+        val resp = exchange(Kwp1281Protocol.TITLE_DTC_REQUEST, ByteArray(0))
         resp.filter { it.title == Kwp1281Protocol.TITLE_DTC_RESPONSE }
             .flatMap { Kwp1281Protocol.decodeDtcResponse(it.data) }
     }
