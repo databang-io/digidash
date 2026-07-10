@@ -544,7 +544,9 @@ class AppViewModel(
                                 unit = m.unit,
                                 status = m.status,
                                 stale = now - m.timestampMillis > STALE_AFTER_MILLIS,
-                                lowConfidence = m.confidence == "low",
+                                // Provenance guardrail: badge EVERYTHING that is
+                                // not fully calibrated/verified (see CLAUDE.md).
+                                lowConfidence = m.confidence != "high",
                             )
                         )
                     }
