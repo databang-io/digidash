@@ -177,6 +177,11 @@ class AppViewModel(
             session.connectionState.collect { state -> _ui.update { it.copy(connection = state) } }
         }
         viewModelScope.launch {
+            (container.deepObdClient).ecuRestarts.collect { n ->
+                _toasts.tryEmit("⚠️ ECU restart detected (#$n) — check power supply / wiring")
+            }
+        }
+        viewModelScope.launch {
             session.events.collect { ev ->
                 when (ev) {
                     is io.databang.digidash.data.repository.SessionEvent.ConnectionDropped ->

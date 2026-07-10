@@ -97,6 +97,7 @@ class DeepObdDiagnosticClient(
                     ?: DiagnosticError.EcuNoResponse)
         }
         s.onMeasureBlock = { block -> _measurementFlow.tryEmit(block) }
+        s.onEcuRestart = { n -> _ecuRestarts.tryEmit(n) }
         s.onGroupFailure = { g -> _groupFailures.tryEmit(g) }
         session = s
         identity = parseIdentity(idResult.getOrDefault(emptyList()), info)
@@ -178,6 +179,13 @@ class DeepObdDiagnosticClient(
             if (groups.isEmpty()) null
             else Kwp1281Session.StreamSpec(groups, basicSettings = basicSettings))
     }
+
+    private val _ecuRestarts = kotlinx.coroutines.flow.MutableSharedFlow<Int>(extraBufferCapacity = 8)
+    /** Spontaneous ECU restart notifications (count so far this session). */
+    val ecuRestarts: kotlinx.coroutines.flow.SharedFlow<Int> = _ecuRestarts
+
+    /** Request a soft 0x00 resync of the live session (KaPoder recovery). */
+    fun requestResync() { session?.requestResync() }
 
     /** Debug: tap RAW stream frames (group, title, data) for offline capture. */
     fun setStreamRawTap(tap: ((Int, Int, ByteArray) -> Unit)?) {

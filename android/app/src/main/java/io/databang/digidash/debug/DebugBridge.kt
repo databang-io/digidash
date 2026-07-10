@@ -73,6 +73,10 @@ class DebugBridge(
                     Log.i(TAG, "dumpgroups DONE -> ${file.absolutePath}")
                     Log.i(TAG, "pull: adb pull ${file.absolutePath}")
                 }
+                "resync" -> {
+                    client.requestResync()
+                    Log.i(TAG, "resync requested (0x00 + counter reset + ident pump)")
+                }
                 "demo" -> {
                     // Switch to the fake backend and connect (desk testing).
                     container.useRealBackend = false

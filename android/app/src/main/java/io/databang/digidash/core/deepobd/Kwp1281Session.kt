@@ -146,7 +146,41 @@ class Kwp1281Session(
     }
 
     @Volatile private var running = false
+    /** Set to run a KaPoder 0x00 resync on the next loop turn (auto on counter
+     *  desync / repeated silence, or via the debug 'resync' command). */
+    @Volatile private var resyncNeeded = false
+    private var consecutiveMismatches = 0
     private var loopThread: Thread? = null
+
+    /** Request a soft resync (0x00 block + counter reset + ident replay pump). */
+    fun requestResync() { resyncNeeded = true }
+
+    /** Spontaneous ECU restarts detected this session (0x55 sync or unsolicited
+     *  ident replay WITHOUT our 0x00) — an ECU power/software instability sign. */
+    @Volatile var ecuRestartCount = 0
+        private set
+    /** True briefly after OUR 0x00 resync, so its ident replay is not counted. */
+    @Volatile private var expectIdentReplay = false
+    @Volatile var onEcuRestart: ((Int) -> Unit)? = null
+
+    /** KaPoder com-error recovery (obdisplay.cpp:1424-1441), loop-thread only:
+     *  send the 0x00 block (sendBlock resets our counter to 0), then pump the
+     *  ECU's replayed F6 ident blocks until its ACK. Measure state is
+     *  invalidated (header cache, latch) — observed live: the ECU re-identifies. */
+    private fun performResync(reason: String) {
+        android.util.Log.i(TAG, "kwp: RESYNC 0x00 ($reason)")
+        expectIdentReplay = true
+        invalidateMeasureState()
+        consecutiveMismatches = 0
+        runCatching { sendBlock(0x00, ByteArray(0)) }
+        var guard = 0
+        while (guard++ < 12) {
+            val b = readBlock() ?: break
+            if (b.title == Kwp1281Protocol.TITLE_ACK) { sendAck(); break }
+            sendAck()
+        }
+        expectIdentReplay = false
+    }
     private val commandQueue = java.util.concurrent.LinkedBlockingQueue<PendingCommand>()
 
     // --- Continuous measuring stream (kw1281test model: the 0x29 polling loop
@@ -287,6 +321,15 @@ class Kwp1281Session(
             var pendingBlocks = 0
             try {
             while (running) {
+                if (resyncNeeded) {
+                    // Fail any in-flight command (its reply is lost anyway),
+                    // then recover the dialog without a full reconnect.
+                    pending?.response?.offer(emptyList())
+                    pending = null; collected.clear(); pendingBlocks = 0
+                    performResync("requested")
+                    resyncNeeded = false
+                    continue
+                }
                 // 1. Read the ECU's block (its turn).
                 val ecuBlock = readBlock()
                 if (ecuBlock == null) {
@@ -299,11 +342,21 @@ class Kwp1281Session(
                     if (pending != null) {
                         pending.response.offer(emptyList()); pending = null; collected.clear()
                     }
+                    if (misses == 2) resyncNeeded = true // one soft recovery first
                     if (misses >= 4) { running = false; break }
                     runCatching { sendAck() }
                     continue
                 }
                 misses = 0
+                // ECU restart indicator: an ident (F6) block arriving while we
+                // sent no 0x00 and expect no reply = the ECU rebooted silently.
+                if (ecuBlock.title == Kwp1281Protocol.TITLE_ASCII &&
+                    pending == null && !awaitingStream && !expectIdentReplay) {
+                    ecuRestartCount++
+                    android.util.Log.w(TAG, "kwp: ECU RESTART suspected (unsolicited ident, #$ecuRestartCount)")
+                    invalidateMeasureState()
+                    onEcuRestart?.invoke(ecuRestartCount)
+                }
                 // 2a. A stream request in flight and no queued command pending:
                 //     this block is the stream's response.
                 val specNow = streamSpec
@@ -683,6 +736,27 @@ class Kwp1281Session(
             if (head.size < unit) return null
             val v = head[0].toInt() and 0xFF
             if (v in 3..64) { len = v; break }
+            if (v == 0x55) {
+                // ECU RESTARTED mid-session (spontaneous reboot / power dip):
+                // it is re-running its init handshake. SOURCED recovery
+                // (kw1281test :491-519): consume the two keyword bytes, pause,
+                // send the complement of KB2, restart counters/caches.
+                ecuRestartCount++
+                android.util.Log.w(TAG, "kwp: ECU RESTART detected (0x55 mid-session, #$ecuRestartCount)")
+                val kb = readExact(2 * unit, 1500)
+                if (kb.size >= unit) {
+                    val kb2 = kb[kb.size - unit].toInt() and 0xFF
+                    Thread.sleep(30)
+                    runCatching {
+                        transport.write(AdapterProtocol.kLineTelegram(activeBaud,
+                            byteArrayOf((kb2.inv() and 0xFF).toByte())))
+                    }
+                }
+                counter = 0
+                invalidateMeasureState()
+                onEcuRestart?.invoke(ecuRestartCount)
+                continue
+            }
             android.util.Log.i(TAG, "kwp: RX skip ${hexOf(head)}")
         }
         if (len < 0) {
@@ -707,6 +781,9 @@ class Kwp1281Session(
         // until validated live — mismatches are visible in every capture.
         if (counter != 0 && blkCounter != ((counter + 1) and 0xFF)) {
             android.util.Log.i(TAG, "kwp: counter mismatch expected %02X got %02X".format((counter + 1) and 0xFF, blkCounter))
+            if (++consecutiveMismatches >= 2) resyncNeeded = true
+        } else {
+            consecutiveMismatches = 0
         }
         counter = blkCounter
         return Block(blkCounter, title, data)
