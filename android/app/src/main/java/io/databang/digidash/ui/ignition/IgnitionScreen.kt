@@ -167,8 +167,10 @@ private fun LambdaCard(
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Lambda / mixture", style = MaterialTheme.typography.titleMedium)
             Text(
-                "The lambda signal should oscillate continuously once the O2 sensor is warm. " +
-                    "A flat line = cold or faulty sensor; use it to set CO on the Digifant pot.",
+                "The lambda signal should oscillate continuously once the O2 sensor is warm " +
+                    "(manual p.36-37: fluctuation > 0.3 V after 1 min at ~2500 rpm, then idle). " +
+                    "A flat line = cold or faulty sensor. Idle speed and CO are NOT adjustable " +
+                    "on the 2E (manual p.33).",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -202,12 +204,11 @@ private fun ValuesCard(state: AppUiState) {
             ValueLine(byKey, "Coolant", "coolant_temp", "coolant_temp_000")
             ValueLine(byKey, "RPM", "rpm", "rpm_000")
             ValueLine(byKey, "Battery", "battery_voltage")
-            ValueLine(byKey, "Ignition advance (ECU)", "ignition_advance")
             ValueLine(byKey, "Throttle", "throttle_angle")
             ValueLine(byKey, "DTC count", "dtc_count")
             Text(
                 "Target timing not configured — the app does not invent a value. " +
-                    "2E spec is typically 6° (4–8°) BTDC at ~2250 rpm.",
+                    "2E spec: 6° ± 1 (window 4–8°) BTDC, checked at 2000–2500 rpm (manual p.34-35).",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -408,18 +409,18 @@ private fun BasicSettingsCard(
 
             if (ign.basicSettingsActive) {
                 RpmTargetIndicator(ign.basicRpm, ign.rpmOnTarget)
-                ign.basicAdvance?.let { adv ->
-                    Text(
-                        "ECU-reported advance: ${adv.toInt()}° BTDC (set with the timing light " +
-                            "on your pulley mark — target ~6°)",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
+                Text(
+                    "Read the timing with a strobe light on your CONFIRMED TDC/pulley mark " +
+                        "at 2000-2500 rpm (manual p.34: spec 4-8° BTDC, set 6 ± 1°) and adjust " +
+                        "mechanically at the distributor. The ECU reports no timing value.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
             Text(
-                "In Basic Settings the ECU holds a fixed condition (~2250 rpm) so you can " +
-                    "read the ignition advance while rotating the distributor. Leaving this " +
-                    "screen exits Basic Settings automatically.",
+                "In Basic Settings the ECU matches itself to the throttle pot at idle and " +
+                    "switches ignition-timing control OFF (manual p.34). YOU rev and hold " +
+                    "2000-2500 rpm for the timing check. Leaving this screen exits Basic " +
+                    "Settings automatically.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

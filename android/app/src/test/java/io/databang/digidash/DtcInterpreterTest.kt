@@ -23,8 +23,9 @@ class DtcInterpreterTest {
 
     @Test
     fun `known critical code gets title and critical severity`() {
-        val dtc = DtcInterpreter.interpret(RawDtc("00515", "27-10"), model)
-        assertEquals("Camshaft Position (Hall) Sensor G40 - no signal", dtc.title)
+        // Manual p.4 fault table: 65535 = control unit defective, the only
+        // unambiguous critical for the 2E.
+        val dtc = DtcInterpreter.interpret(RawDtc("65535", "27-10"), model)
         assertEquals(DtcSeverity.CRITICAL, dtc.severity)
     }
 
@@ -45,6 +46,8 @@ class DtcInterpreterTest {
     fun `no model still returns raw code`() {
         val dtc = DtcInterpreter.interpret(RawDtc("00515"), null)
         assertEquals("00515", dtc.code)
-        assertEquals(DtcSeverity.CRITICAL, dtc.severity)
+        // 00515 is not in the manual's 2E fault table -> not critical; with no
+        // model catalog there is no title either -> INFO.
+        assertEquals(DtcSeverity.INFO, dtc.severity)
     }
 }

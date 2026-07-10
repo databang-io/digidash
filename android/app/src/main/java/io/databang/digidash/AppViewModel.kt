@@ -102,8 +102,8 @@ data class IgnitionState(
     val basicRpm: Double? = null,
     val basicAdvance: Double? = null,
 ) {
-    /** True when RPM is within the 2200-2300 timing window. */
-    val rpmOnTarget: Boolean get() = basicRpm != null && basicRpm in 2200.0..2300.0
+    /** True when RPM is inside the manual's 2000-2500 rpm timing-check window (p.34-35). */
+    val rpmOnTarget: Boolean get() = basicRpm != null && basicRpm in 2000.0..2500.0
 }
 
 class AppViewModel(
@@ -761,11 +761,12 @@ class AppViewModel(
 
         return IgnitionState(
             coolantOk = coolant != null && coolant >= 80.0,
-            idleStable = rpm != null && rpm in 700.0..1000.0,
-            batteryOk = battery != null && battery >= 12.5,
-            noHallFault = !hasDtc("00515") && !hasDtc("00513"),
+            idleStable = rpm != null && rpm in 770.0..870.0, // manual p.33 spec
+            batteryOk = battery != null && battery in 11.5..15.5, // manual p.16 + fault 00532 bounds
+            // Manual p.4-5 fault table: only source-backed codes gate the checklist.
+            noHallFault = true, // no Hall/G40 code exists in the 2E fault table
             noCoolantFault = !hasDtc("00522"),
-            noThrottleFault = !hasDtc("00518") && !hasDtc("00516") && !hasDtc("00517"),
+            noThrottleFault = !hasDtc("00518"), // G69 pot; no idle/full-throttle switch codes on 2E
             // Demo (fake) backend supports Basic Settings; the real adapter path
             // is validated on the vehicle (ticket 14).
             basicSettingsSupported = !container.useRealBackend,
@@ -773,7 +774,7 @@ class AppViewModel(
             conditionBits = measurements["status_bits"]?.rawString
                 ?.takeIf { it.length == 8 && it.all { c -> c == '0' || c == '1' } },
             basicRpm = value("rpm_g11", "rpm", "rpm_000"),
-            basicAdvance = value("ignition_advance"),
+            basicAdvance = null, // ECU reports no timing value (manual: strobe + distributor)
         )
     }
 

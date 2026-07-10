@@ -1,731 +1,715 @@
 {
-  "ecu_model_version": 1,
-  "ecu_part_number": "037906024AG",
-  "display_name": "VW Digifant 2E (Demo) - 037 906 024 00",
-  "protocol": "KWP1281",
-  "system": "Digifant",
-  "engine_codes": [
-    "2E"
-  ],
-  "source": {
-    "type": "lbl-inferred",
-    "confidence": "medium",
-    "notes": "Groups 001-010 inferred from sibling label file 037-906-023; group 000 layout candidate from successor 037-906-025-ADY; thresholds and DTC catalog from consolidated web research (docs/20-Digifant2E-Research.md). No official label exists for 037-906-024. Validate on real vehicle (ticket 14). Groups >0 may return invalid on some firmwares - fall back to group 000."
-  },
-  "compatibility": {
-    "vehicle_notes": "VW T3 home conversion, engine side 2E, drivetrain side JX (flywheel/clutch/bellhousing/gearbox). Do not assume Golf 3 flywheel timing marks.",
-    "inferred_from": "037-906-023"
-  },
-  "groups": {
-    "000": {
-      "label": "Primary display (10 raw fields, no type bytes) - gateway to Basic Settings",
-      "polling_priority": "trip",
-      "fields": [
-        {
-          "index": 1,
-          "key": "intake_air_temp_000",
-          "name": "Intake air temp (candidate)",
-          "unit": "",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low",
-          "notes": "Non-linear NTC raw 70-160 at idle = 4.5-72degC. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
-        },
-        {
-          "index": 2,
-          "key": "battery_voltage",
-          "name": "Battery voltage (candidate)",
-          "unit": "V",
-          "value_type": "number",
-          "formula": {
-            "type": "scale_offset",
-            "scale": 0.1024,
-            "offset": 0.0
-          },
-          "confidence": "low",
-          "display": {
-            "trip_card": true,
-            "order": 25
-          },
-          "thresholds": {
-            "normal": {
-              "min": 12.5,
-              "max": 14.8
-            },
-            "warning": {
-              "min": 11.5,
-              "max": 15.2
-            },
-            "critical": {
-              "max": 11.5
-            }
-          },
-          "notes": "raw 115-161 = 12.0-16.5 V (V ~ raw*0.1024). Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
-        },
-        {
-          "index": 3,
-          "key": "coolant_temp_000",
-          "name": "Coolant temp (candidate)",
-          "unit": "°C",
-          "value_type": "number",
-          "formula": {
-            "type": "scale_offset",
-            "scale": 1.0,
-            "offset": -40.0
-          },
-          "confidence": "low",
-          "notes": "degC = raw - 40 (exact on 025-ADY). Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
-        },
-        {
-          "index": 4,
-          "key": "engine_load_000",
-          "name": "Engine load (candidate)",
-          "unit": "%",
-          "value_type": "number",
-          "formula": {
-            "type": "scale_offset",
-            "scale": 0.39,
-            "offset": 0.0
-          },
-          "confidence": "low",
-          "notes": "raw 25-55 = 9.75-19.5% at idle. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
-        },
-        {
-          "index": 5,
-          "key": "lambda_voltage",
-          "name": "Lambda sensor voltage (candidate)",
-          "unit": "V",
-          "value_type": "number",
-          "formula": {
-            "type": "scale_offset",
-            "scale": 0.02,
-            "offset": 0.0
-          },
-          "confidence": "low",
-          "notes": "V = raw*0.02; 0-1.10 V. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
-        },
-        {
-          "index": 6,
-          "key": "lambda_learning",
-          "name": "Lambda learning additive (candidate)",
-          "unit": "ms",
-          "value_type": "number",
-          "formula": {
-            "type": "scale_offset",
-            "scale": 0.034,
-            "offset": 0.0
-          },
-          "confidence": "low",
-          "notes": "raw 0-22 = 0-0.75 ms. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
-        },
-        {
-          "index": 7,
-          "key": "operating_bits",
-          "name": "Operating condition bitfield",
-          "unit": "",
-          "value_type": "unknown",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low",
-          "notes": "Bitfield. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
-        },
-        {
-          "index": 8,
-          "key": "throttle_angle_000",
-          "name": "Throttle angle (candidate)",
-          "unit": "°",
-          "value_type": "number",
-          "formula": {
-            "type": "scale_offset",
-            "scale": 0.5,
-            "offset": 0.0
-          },
-          "confidence": "low",
-          "notes": "raw 5-14 = 2.5-6.5deg at idle. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
-        },
-        {
-          "index": 9,
-          "key": "injection_time_000",
-          "name": "Injection time (candidate)",
-          "unit": "ms",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low",
-          "notes": "~2-4 ms at warm idle. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
-        },
-        {
-          "index": 10,
-          "key": "rpm_000",
-          "name": "Engine speed (candidate)",
-          "unit": "rpm",
-          "value_type": "number",
-          "formula": {
-            "type": "scale_offset",
-            "scale": 32.0,
-            "offset": 0.0
-          },
-          "confidence": "low",
-          "notes": "rpm = raw*32 (exact on 025-ADY); raw 23-27 = 736-864 rpm idle. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
-        }
-      ]
+ "ecu_model_version": 1,
+ "ecu_part_number": "037906024AG",
+ "display_name": "VW Digifant 2E (Demo) - 037 906 024 00",
+ "protocol": "KWP1281",
+ "system": "Digifant",
+ "engine_codes": [
+  "2E"
+ ],
+ "source": {
+  "type": "lbl-inferred",
+  "confidence": "medium",
+  "notes": "Groups 001-010 inferred from sibling label file 037-906-023; group 000 layout candidate from successor 037-906-025-ADY; thresholds and DTC catalog from consolidated web research (docs/20-Digifant2E-Research.md). No official label exists for 037-906-024. Validate on real vehicle (ticket 14). Groups >0 may return invalid on some firmwares - fall back to group 000."
+ },
+ "compatibility": {
+  "vehicle_notes": "VW T3 home conversion, engine side 2E, drivetrain side JX (flywheel/clutch/bellhousing/gearbox). Do not assume Golf 3 flywheel timing marks.",
+  "inferred_from": "037-906-023"
+ },
+ "groups": {
+  "000": {
+   "label": "Primary display (10 raw fields, no type bytes) - gateway to Basic Settings",
+   "polling_priority": "trip",
+   "fields": [
+    {
+     "index": 1,
+     "key": "intake_air_temp_000",
+     "name": "Intake air temp (candidate)",
+     "unit": "",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low",
+     "notes": "Non-linear NTC raw 70-160 at idle = 4.5-72degC. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
     },
-    "001": {
-      "label": "Engine speed / load / coolant / injection",
-      "polling_priority": "trip",
-      "fields": [
-        {
-          "index": 1,
-          "key": "rpm",
-          "name": "Engine speed",
-          "unit": "rpm",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "critical": true,
-          "confidence": "medium",
-          "display": {
-            "trip_card": true,
-            "order": 10
-          },
-          "thresholds": {
-            "normal": {
-              "min": 600,
-              "max": 5800
-            },
-            "warning": {
-              "min": 0,
-              "max": 6300
-            },
-            "critical": {
-              "min": 6300
-            }
-          },
-          "notes": "Idle spec 750-850 rpm on sibling label; soft governor ~6300 rpm by fuel cut"
-        },
-        {
-          "index": 2,
-          "key": "engine_load",
-          "name": "Engine load (VAF)",
-          "unit": "%",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "medium",
-          "display": {
-            "trip_card": true,
-            "order": 50
-          },
-          "notes": "16-26% at warm idle; 5-15% suggests vacuum leak; 0-2% open circuit in VAF wiring"
-        },
-        {
-          "index": 3,
-          "key": "coolant_temp",
-          "name": "Coolant temperature",
-          "unit": "°C",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "critical": true,
-          "confidence": "medium",
-          "display": {
-            "trip_card": true,
-            "order": 20
-          },
-          "thresholds": {
-            "normal": {
-              "min": 75,
-              "max": 102
-            },
-            "warning": {
-              "min": -40,
-              "max": 108
-            },
-            "critical": {
-              "min": 108
-            }
-          },
-          "notes": "-40°C = open circuit, constant 80°C = short circuit (G62 sensor)"
-        },
-        {
-          "index": 4,
-          "key": "injection_time",
-          "name": "Injection time",
-          "unit": "ms",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "medium",
-          "display": {
-            "trip_card": true,
-            "order": 40
-          },
-          "notes": "Typically 1.5-2.5 ms warm idle; must increase with load; 0 during deceleration fuel cut"
-        }
-      ]
+    {
+     "index": 2,
+     "key": "battery_voltage",
+     "name": "Battery voltage (candidate)",
+     "unit": "V",
+     "value_type": "number",
+     "formula": {
+      "type": "scale_offset",
+      "scale": 0.1024,
+      "offset": 0.0
+     },
+     "confidence": "low",
+     "display": {
+      "trip_card": true,
+      "order": 25
+     },
+     "thresholds": {
+      "normal": {
+       "min": 12.5,
+       "max": 14.8
+      },
+      "warning": {
+       "min": 11.5,
+       "max": 15.2
+      },
+      "critical": {
+       "max": 11.5
+      }
+     },
+     "notes": "raw 115-161 = 12.0-16.5 V (V ~ raw*0.1024). Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
     },
-    "002": {
-      "label": "Engine speed / intake air temp / injection",
-      "polling_priority": "trip",
-      "fields": [
-        {
-          "index": 1,
-          "key": "rpm_g2",
-          "name": "Engine speed",
-          "unit": "rpm",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "medium"
-        },
-        {
-          "index": 2,
-          "key": "intake_air_temp",
-          "name": "Intake air temperature",
-          "unit": "°C",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "medium",
-          "display": {
-            "trip_card": true,
-            "order": 30
-          },
-          "thresholds": {
-            "normal": {
-              "min": -20,
-              "max": 70
-            },
-            "warning": {
-              "min": -40,
-              "max": 90
-            },
-            "critical": {
-              "min": 90
-            }
-          },
-          "notes": "-40°C = open circuit, constant 80°C = short circuit (G42 sensor)"
-        },
-        {
-          "index": 3,
-          "key": "raw_002_3",
-          "name": "Raw field 002/3",
-          "unit": "",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low",
-          "notes": "Sibling label: fixed value ~10 at warm idle, no unit"
-        },
-        {
-          "index": 4,
-          "key": "injection_time_g2",
-          "name": "Injection time",
-          "unit": "ms",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "medium"
-        }
-      ]
+    {
+     "index": 3,
+     "key": "coolant_temp_000",
+     "name": "Coolant temp (candidate)",
+     "unit": "°C",
+     "value_type": "number",
+     "formula": {
+      "type": "scale_offset",
+      "scale": 1.0,
+      "offset": -40.0
+     },
+     "confidence": "low",
+     "notes": "degC = raw - 40 (exact on 025-ADY). Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
     },
-    "003": {
-      "label": "Engine speed / engine temp / injection",
-      "polling_priority": "garage",
-      "fields": [
-        {
-          "index": 1,
-          "key": "rpm_g3",
-          "name": "Engine speed",
-          "unit": "rpm",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "medium"
-        },
-        {
-          "index": 2,
-          "key": "engine_temp",
-          "name": "Engine temperature",
-          "unit": "°C",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low",
-          "notes": "Working range -40°C to +141°C on sibling label"
-        },
-        {
-          "index": 3,
-          "key": "raw_003_3",
-          "name": "Raw field 003/3",
-          "unit": "",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low",
-          "notes": "Fixed value ~202 at warm idle on sibling label"
-        },
-        {
-          "index": 4,
-          "key": "injection_time_g3",
-          "name": "Injection time",
-          "unit": "ms",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "medium",
-          "notes": "Max observed 18 ms on sibling label"
-        }
-      ]
+    {
+     "index": 4,
+     "key": "engine_load_000",
+     "name": "Engine load (candidate)",
+     "unit": "%",
+     "value_type": "number",
+     "formula": {
+      "type": "scale_offset",
+      "scale": 0.39,
+      "offset": 0.0
+     },
+     "confidence": "low",
+     "notes": "raw 25-55 = 9.75-19.5% at idle. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
     },
-    "004": {
-      "label": "Engine speed / load / injection (decel cut check)",
-      "polling_priority": "garage",
-      "fields": [
-        {
-          "index": 1,
-          "key": "rpm_g4",
-          "name": "Engine speed",
-          "unit": "rpm",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "medium"
-        },
-        {
-          "index": 2,
-          "key": "engine_load_g4",
-          "name": "Engine load (VAF)",
-          "unit": "%",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "medium"
-        },
-        {
-          "index": 3,
-          "key": "raw_004_3",
-          "name": "Raw field 004/3",
-          "unit": "",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low"
-        },
-        {
-          "index": 4,
-          "key": "injection_time_g4",
-          "name": "Injection time",
-          "unit": "ms",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "medium",
-          "notes": "Must drop to 0 ms during deceleration fuel cut-off"
-        }
-      ]
+    {
+     "index": 5,
+     "key": "lambda_voltage",
+     "name": "Lambda sensor voltage (candidate)",
+     "unit": "V",
+     "value_type": "number",
+     "formula": {
+      "type": "scale_offset",
+      "scale": 0.02,
+      "offset": 0.0
+     },
+     "confidence": "low",
+     "notes": "V = raw*0.02; 0-1.10 V. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
     },
-    "005": {
-      "label": "Engine speed / throttle angle / injection",
-      "polling_priority": "garage",
-      "fields": [
-        {
-          "index": 1,
-          "key": "rpm_g5",
-          "name": "Engine speed",
-          "unit": "rpm",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "medium"
-        },
-        {
-          "index": 2,
-          "key": "throttle_angle",
-          "name": "Throttle valve angle",
-          "unit": "°",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "medium",
-          "display": {
-            "trip_card": true,
-            "order": 60
-          },
-          "notes": "WOT >= 90°; 0.0° = open circuit to TPS; >=90° at idle = short to + in TPS wiring"
-        },
-        {
-          "index": 3,
-          "key": "raw_005_3",
-          "name": "Raw field 005/3",
-          "unit": "",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low"
-        },
-        {
-          "index": 4,
-          "key": "injection_time_g5",
-          "name": "Injection time",
-          "unit": "ms",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "medium"
-        }
-      ]
+    {
+     "index": 6,
+     "key": "lambda_learning",
+     "name": "Lambda learning additive (candidate)",
+     "unit": "ms",
+     "value_type": "number",
+     "formula": {
+      "type": "scale_offset",
+      "scale": 0.034,
+      "offset": 0.0
+     },
+     "confidence": "low",
+     "notes": "raw 0-22 = 0-0.75 ms. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
     },
-    "006": {
-      "label": "Engine speed / intake air temp (undocumented)",
-      "polling_priority": "garage",
-      "fields": [
-        {
-          "index": 1,
-          "key": "rpm_g6",
-          "name": "Engine speed",
-          "unit": "rpm",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low"
-        },
-        {
-          "index": 2,
-          "key": "intake_air_temp_g6",
-          "name": "Intake air temperature",
-          "unit": "°C",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low"
-        },
-        {
-          "index": 3,
-          "key": "raw_006_3",
-          "name": "Raw field 006/3",
-          "unit": "",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low"
-        },
-        {
-          "index": 4,
-          "key": "raw_006_4",
-          "name": "Raw field 006/4",
-          "unit": "",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low"
-        }
-      ]
+    {
+     "index": 7,
+     "key": "operating_bits",
+     "name": "Operating condition bitfield",
+     "unit": "",
+     "value_type": "unknown",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low",
+     "notes": "Bitfield. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
     },
-    "009": {
-      "label": "Engine speed / lambda signal (undocumented)",
-      "polling_priority": "garage",
-      "fields": [
-        {
-          "index": 1,
-          "key": "rpm_g9",
-          "name": "Engine speed",
-          "unit": "rpm",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low"
-        },
-        {
-          "index": 2,
-          "key": "lambda_signal",
-          "name": "Lambda signal (candidate)",
-          "unit": "",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low",
-          "display": {
-            "trip_card": true,
-            "order": 70
-          },
-          "notes": "Sibling label: varies 30-50 at warm idle, no units; validate on vehicle"
-        },
-        {
-          "index": 3,
-          "key": "raw_009_3",
-          "name": "Raw field 009/3",
-          "unit": "",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low"
-        },
-        {
-          "index": 4,
-          "key": "raw_009_4",
-          "name": "Raw field 009/4",
-          "unit": "",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low"
-        }
-      ]
+    {
+     "index": 8,
+     "key": "throttle_angle_000",
+     "name": "Throttle angle (candidate)",
+     "unit": "°",
+     "value_type": "number",
+     "formula": {
+      "type": "scale_offset",
+      "scale": 0.5,
+      "offset": 0.0
+     },
+     "confidence": "low",
+     "notes": "raw 5-14 = 2.5-6.5deg at idle. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
     },
-    "010": {
-      "label": "Engine speed / lambda signal wide (undocumented)",
-      "polling_priority": "garage",
-      "fields": [
-        {
-          "index": 1,
-          "key": "rpm_g10",
-          "name": "Engine speed",
-          "unit": "rpm",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low"
-        },
-        {
-          "index": 2,
-          "key": "lambda_signal_wide",
-          "name": "Lambda signal wide (candidate)",
-          "unit": "",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low",
-          "notes": "Sibling label: varies widely 0-256, no units"
-        },
-        {
-          "index": 3,
-          "key": "raw_010_3",
-          "name": "Raw field 010/3",
-          "unit": "",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low"
-        },
-        {
-          "index": 4,
-          "key": "raw_010_4",
-          "name": "Raw field 010/4",
-          "unit": "",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low"
-        }
-      ]
+    {
+     "index": 9,
+     "key": "injection_time_000",
+     "name": "Injection time (candidate)",
+     "unit": "ms",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low",
+     "notes": "~2-4 ms at warm idle. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
     },
-    "011": {
-      "label": "Ignition timing (Basic Settings candidate) - validate on vehicle",
-      "polling_priority": "garage",
-      "fields": [
-        {
-          "index": 1,
-          "key": "rpm_g11",
-          "name": "Engine speed",
-          "unit": "rpm",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low"
-        },
-        {
-          "index": 2,
-          "key": "ignition_advance",
-          "name": "Ignition advance (ECU-reported)",
-          "unit": "°BTDC",
-          "value_type": "number",
-          "formula": {
-            "type": "raw"
-          },
-          "confidence": "low",
-          "display": {
-            "trip_card": true,
-            "order": 80
-          },
-          "notes": "Spec 6 (4-8) deg BTDC at ~2250 rpm in Basic Settings. ECU-reported only; timing is set mechanically by rotating the distributor. Validate on vehicle."
-        }
-      ]
+    {
+     "index": 10,
+     "key": "rpm_000",
+     "name": "Engine speed (candidate)",
+     "unit": "rpm",
+     "value_type": "number",
+     "formula": {
+      "type": "scale_offset",
+      "scale": 32.0,
+      "offset": 0.0
+     },
+     "confidence": "low",
+     "notes": "rpm = raw*32 (exact on 025-ADY); raw 23-27 = 736-864 rpm idle. Layout candidate A from successor label 037-906-025-ADY; alternative layout B exists (ABK twin: coolant/load/rpm/idle-stab/lambda/ignition). MUST be verified on the 2E (ticket 14)."
     }
+   ]
   },
-  "dtc_catalog": {
-    "00281": "Vehicle Speed Sensor G68 - no signal",
-    "00512": "Hall sensor reference point / signal error",
-    "00513": "Engine Speed Sensor G28",
-    "00514": "Reference point sensor G4",
-    "00515": "Camshaft Position (Hall) Sensor G40 - no signal (classic 2E stall fault, check distributor)",
-    "00516": "Idle switch F60",
-    "00517": "Full throttle switch F81",
-    "00518": "Throttle Position Sensor G69",
-    "00519": "Intake Manifold Pressure Sensor",
-    "00520": "Air Flow Meter G70/G19 (2E: vane AFM)",
-    "00521": "CO potentiometer G74",
-    "00522": "Coolant Temperature Sensor G62 - open/short (symptom: 1200-3000 rpm warm-start idle)",
-    "00523": "Intake Air Temperature Sensor G42",
-    "00524": "Knock Sensor 1 (G61)",
-    "00525": "Oxygen (Lambda) Sensor G39",
-    "00526": "Knock Sensor 2 (G66)",
-    "00527": "Intake Air Temperature Sensor (G42)",
-    "00528": "Reference Mark / TDC Sensor",
-    "00530": "Throttle positioner potentiometer G88",
-    "00532": "Supply Voltage B+ too low/high",
-    "00533": "Idle Speed Regulation adaptation limit",
-    "00537": "Lambda Regulation at limit",
-    "00540": "Knock Control",
-    "00543": "Maximum engine speed exceeded",
-    "00545": "Engine-gearbox electrical connection",
-    "00549": "Consumption signal",
-    "00552": "Mass Air Flow Sensor (G70)",
-    "00553": "Air Mass Sensor",
-    "00554": "Oxygen Sensor / Lambda Control",
-    "00555": "Oxygen (Lambda) Sensor (G39)",
-    "00560": "Mixture Adaptation",
-    "00561": "Mixture Adaptation limit",
-    "00575": "Intake Manifold Pressure",
-    "00577": "Knock Control Cylinder 1",
-    "01025": "Malfunction Indicator Lamp (MIL)",
-    "65535": "Internal Control Module Memory Error (ECU defective)"
+  "001": {
+   "label": "Engine speed / load / coolant / injection",
+   "polling_priority": "trip",
+   "fields": [
+    {
+     "index": 1,
+     "key": "rpm",
+     "name": "Engine speed",
+     "unit": "rpm",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "critical": true,
+     "confidence": "medium",
+     "display": {
+      "trip_card": true,
+      "order": 10
+     },
+     "thresholds": {
+      "normal": {
+       "min": 600,
+       "max": 5800
+      },
+      "warning": {
+       "min": 0,
+       "max": 6300
+      },
+      "critical": {
+       "min": 6300
+      }
+     },
+     "notes": "Idle spec 750-850 rpm on sibling label; soft governor ~6300 rpm by fuel cut"
+    },
+    {
+     "index": 2,
+     "key": "engine_load",
+     "name": "Engine load (VAF)",
+     "unit": "%",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "medium",
+     "display": {
+      "trip_card": true,
+      "order": 50
+     },
+     "notes": "16-26% at warm idle; 5-15% suggests vacuum leak; 0-2% open circuit in VAF wiring"
+    },
+    {
+     "index": 3,
+     "key": "coolant_temp",
+     "name": "Coolant temperature",
+     "unit": "°C",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "critical": true,
+     "confidence": "medium",
+     "display": {
+      "trip_card": true,
+      "order": 20
+     },
+     "thresholds": {
+      "normal": {
+       "min": 75,
+       "max": 102
+      },
+      "warning": {
+       "min": -40,
+       "max": 108
+      },
+      "critical": {
+       "min": 108
+      }
+     },
+     "notes": "-40°C = open circuit, constant 80°C = short circuit (G62 sensor)"
+    },
+    {
+     "index": 4,
+     "key": "injection_time",
+     "name": "Injection time",
+     "unit": "ms",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "medium",
+     "display": {
+      "trip_card": true,
+      "order": 40
+     },
+     "notes": "Typically 1.5-2.5 ms warm idle; must increase with load; 0 during deceleration fuel cut"
+    }
+   ]
+  },
+  "002": {
+   "label": "Engine speed / intake air temp / injection",
+   "polling_priority": "trip",
+   "fields": [
+    {
+     "index": 1,
+     "key": "rpm_g2",
+     "name": "Engine speed",
+     "unit": "rpm",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "medium"
+    },
+    {
+     "index": 2,
+     "key": "intake_air_temp",
+     "name": "Intake air temperature",
+     "unit": "°C",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "medium",
+     "display": {
+      "trip_card": true,
+      "order": 30
+     },
+     "thresholds": {
+      "normal": {
+       "min": -20,
+       "max": 70
+      },
+      "warning": {
+       "min": -40,
+       "max": 90
+      },
+      "critical": {
+       "min": 90
+      }
+     },
+     "notes": "-40°C = open circuit, constant 80°C = short circuit (G42 sensor)"
+    },
+    {
+     "index": 3,
+     "key": "raw_002_3",
+     "name": "Raw field 002/3",
+     "unit": "",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low",
+     "notes": "Sibling label: fixed value ~10 at warm idle, no unit"
+    },
+    {
+     "index": 4,
+     "key": "injection_time_g2",
+     "name": "Injection time",
+     "unit": "ms",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "medium"
+    }
+   ]
+  },
+  "003": {
+   "label": "Engine speed / engine temp / injection",
+   "polling_priority": "garage",
+   "fields": [
+    {
+     "index": 1,
+     "key": "rpm_g3",
+     "name": "Engine speed",
+     "unit": "rpm",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "medium"
+    },
+    {
+     "index": 2,
+     "key": "engine_temp",
+     "name": "Engine temperature",
+     "unit": "°C",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low",
+     "notes": "Working range -40°C to +141°C on sibling label"
+    },
+    {
+     "index": 3,
+     "key": "raw_003_3",
+     "name": "Raw field 003/3",
+     "unit": "",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low",
+     "notes": "Fixed value ~202 at warm idle on sibling label"
+    },
+    {
+     "index": 4,
+     "key": "injection_time_g3",
+     "name": "Injection time",
+     "unit": "ms",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "medium",
+     "notes": "Max observed 18 ms on sibling label"
+    }
+   ]
+  },
+  "004": {
+   "label": "Engine speed / load / injection (decel cut check)",
+   "polling_priority": "garage",
+   "fields": [
+    {
+     "index": 1,
+     "key": "rpm_g4",
+     "name": "Engine speed",
+     "unit": "rpm",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "medium"
+    },
+    {
+     "index": 2,
+     "key": "engine_load_g4",
+     "name": "Engine load (VAF)",
+     "unit": "%",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "medium"
+    },
+    {
+     "index": 3,
+     "key": "raw_004_3",
+     "name": "Raw field 004/3",
+     "unit": "",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low"
+    },
+    {
+     "index": 4,
+     "key": "injection_time_g4",
+     "name": "Injection time",
+     "unit": "ms",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "medium",
+     "notes": "Must drop to 0 ms during deceleration fuel cut-off"
+    }
+   ]
+  },
+  "005": {
+   "label": "Engine speed / throttle angle / injection",
+   "polling_priority": "garage",
+   "fields": [
+    {
+     "index": 1,
+     "key": "rpm_g5",
+     "name": "Engine speed",
+     "unit": "rpm",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "medium"
+    },
+    {
+     "index": 2,
+     "key": "throttle_angle",
+     "name": "Throttle valve angle",
+     "unit": "°",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "medium",
+     "display": {
+      "trip_card": true,
+      "order": 60
+     },
+     "notes": "WOT >= 90°; 0.0° = open circuit to TPS; >=90° at idle = short to + in TPS wiring"
+    },
+    {
+     "index": 3,
+     "key": "raw_005_3",
+     "name": "Raw field 005/3",
+     "unit": "",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low"
+    },
+    {
+     "index": 4,
+     "key": "injection_time_g5",
+     "name": "Injection time",
+     "unit": "ms",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "medium"
+    }
+   ]
+  },
+  "006": {
+   "label": "Engine speed / intake air temp (undocumented)",
+   "polling_priority": "garage",
+   "fields": [
+    {
+     "index": 1,
+     "key": "rpm_g6",
+     "name": "Engine speed",
+     "unit": "rpm",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low"
+    },
+    {
+     "index": 2,
+     "key": "intake_air_temp_g6",
+     "name": "Intake air temperature",
+     "unit": "°C",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low"
+    },
+    {
+     "index": 3,
+     "key": "raw_006_3",
+     "name": "Raw field 006/3",
+     "unit": "",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low"
+    },
+    {
+     "index": 4,
+     "key": "raw_006_4",
+     "name": "Raw field 006/4",
+     "unit": "",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low"
+    }
+   ]
+  },
+  "009": {
+   "label": "Engine speed / lambda signal (undocumented)",
+   "polling_priority": "garage",
+   "fields": [
+    {
+     "index": 1,
+     "key": "rpm_g9",
+     "name": "Engine speed",
+     "unit": "rpm",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low"
+    },
+    {
+     "index": 2,
+     "key": "lambda_signal",
+     "name": "Lambda signal (candidate)",
+     "unit": "",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low",
+     "display": {
+      "trip_card": true,
+      "order": 70
+     },
+     "notes": "Sibling label: varies 30-50 at warm idle, no units; validate on vehicle"
+    },
+    {
+     "index": 3,
+     "key": "raw_009_3",
+     "name": "Raw field 009/3",
+     "unit": "",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low"
+    },
+    {
+     "index": 4,
+     "key": "raw_009_4",
+     "name": "Raw field 009/4",
+     "unit": "",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low"
+    }
+   ]
+  },
+  "010": {
+   "label": "Engine speed / lambda signal wide (undocumented)",
+   "polling_priority": "garage",
+   "fields": [
+    {
+     "index": 1,
+     "key": "rpm_g10",
+     "name": "Engine speed",
+     "unit": "rpm",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low"
+    },
+    {
+     "index": 2,
+     "key": "lambda_signal_wide",
+     "name": "Lambda signal wide (candidate)",
+     "unit": "",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low",
+     "notes": "Sibling label: varies widely 0-256, no units"
+    },
+    {
+     "index": 3,
+     "key": "raw_010_3",
+     "name": "Raw field 010/3",
+     "unit": "",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low"
+    },
+    {
+     "index": 4,
+     "key": "raw_010_4",
+     "name": "Raw field 010/4",
+     "unit": "",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low"
+    }
+   ]
+  },
+  "011": {
+   "label": "Ignition timing (Basic Settings candidate) - validate on vehicle",
+   "polling_priority": "garage",
+   "fields": [
+    {
+     "index": 1,
+     "key": "rpm_g11",
+     "name": "Engine speed",
+     "unit": "rpm",
+     "value_type": "number",
+     "formula": {
+      "type": "raw"
+     },
+     "confidence": "low"
+    }
+   ]
   }
+ },
+ "dtc_catalog": {
+  "00281": "Vehicle Speed Sensor G68 - no signal",
+  "00512": "Hall sensor reference point / signal error",
+  "00513": "Engine Speed Sensor G28",
+  "00514": "Reference point sensor G4",
+  "00515": "Camshaft Position (Hall) Sensor G40 - no signal (classic 2E stall fault, check distributor)",
+  "00516": "Idle switch F60",
+  "00517": "Full throttle switch F81",
+  "00518": "Throttle Position Sensor G69",
+  "00519": "Intake Manifold Pressure Sensor",
+  "00520": "Air Flow Meter G70/G19 (2E: vane AFM)",
+  "00521": "CO potentiometer G74",
+  "00522": "Coolant Temperature Sensor G62 - open/short (symptom: 1200-3000 rpm warm-start idle)",
+  "00523": "Intake Air Temperature Sensor G42",
+  "00524": "Knock Sensor 1 (G61)",
+  "00525": "Oxygen (Lambda) Sensor G39",
+  "00526": "Knock Sensor 2 (G66)",
+  "00527": "Intake Air Temperature Sensor (G42)",
+  "00528": "Reference Mark / TDC Sensor",
+  "00530": "Throttle positioner potentiometer G88",
+  "00532": "Supply Voltage B+ too low/high",
+  "00533": "Idle Speed Regulation adaptation limit",
+  "00537": "Lambda Regulation at limit",
+  "00540": "Knock Control",
+  "00543": "Maximum engine speed exceeded",
+  "00545": "Engine-gearbox electrical connection",
+  "00549": "Consumption signal",
+  "00552": "Mass Air Flow Sensor (G70)",
+  "00553": "Air Mass Sensor",
+  "00554": "Oxygen Sensor / Lambda Control",
+  "00555": "Oxygen (Lambda) Sensor (G39)",
+  "00560": "Mixture Adaptation",
+  "00561": "Mixture Adaptation limit",
+  "00575": "Intake Manifold Pressure",
+  "00577": "Knock Control Cylinder 1",
+  "01025": "Malfunction Indicator Lamp (MIL)",
+  "65535": "Internal Control Module Memory Error (ECU defective)"
+ }
 }

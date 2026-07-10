@@ -9,7 +9,7 @@
  ],
  "source": {
   "type": "lbl-inferred",
-  "confidence": "high",
+  "confidence": "medium",
   "notes": "PROVENANCE POLICY (see CLAUDE.md guardrails): every field note starts with its source class (MEASURED on this car / MANUAL page / label-<file> sibling / INFERRED). No unit is displayed unless the conversion is calibrated (>=2 anchors or authoritative doc). Groups 001-004 zone semantics: MANUAL (ed. 04.1993, prog level >=1390) — not yet readable on the wire (0x29 returns a static legacy table; see docs/Next-Garage-Session.md). Group 000 = the live 0x12->0xF4 block, zones per sibling label 037906023 cross-checked live (no official 024 label exists; the 024-AB redirect was never finished per clubgti). Battery card = adapter FC telegram x0.1V (SOURCE docs/DeepOBD-Observed-API.md). Timing specs: MANUAL — check 4-8° BTDC @2000-2500 in basic setting, set 6±1°; full advance 35-45° @2800; idle 770-870; CO 0.2-1.2%. IGNITION TIMING: read in BASIC SETTINGS (0x28) from group 001 per the manual (prog level >=1390; ours 1576), NOT from 0x29 measurement blocks. The normal 0x29 group-001 header we captured is rpm/coolant/lambda/bits; the 0x28 basic-settings group-001 header is expected to expose the ignition-angle zone (wire formula 0x83/0x8F) — to be captured live."
  },
  "compatibility": {
@@ -66,7 +66,7 @@
     {
      "index": 4,
      "key": "rpm",
-     "name": "Engine speed",
+     "name": "Engine speed (estimated)",
      "unit": "rpm",
      "value_type": "number",
      "formula": {
@@ -74,8 +74,8 @@
       "scale": 35.0,
       "offset": -1120.0
      },
-     "confidence": "medium",
-     "notes": "FORMULA (raw-32)*35 — anchors: MEASURED engine-off raw=0x20 -> 0 rpm (exact); MEASURED held \"~3000±\" -> raw 0x65-0x73 (fuzzy, ±15%). Refine vs a real tachometer. Position: label z4 obs 054 = our idle 0x36.",
+     "confidence": "low",
+     "notes": "ESTIMATED fit, 2 anchors both MEASURED on this car: engine-off raw=0x20 -> 0 rpm (exact) and a user-held \"~3000 +/-\" -> raw 0x65-0x73 (fuzzy, +/-15%). The manual publishes NO group-000 scaling (p34: zone numbers \"not relevant\"). Refine against a tachometer or drop once wire group-1 RPM (formula 0x8B) streams live.",
      "critical": true,
      "display": {
       "trip_card": true,
@@ -281,14 +281,14 @@
     {
      "index": 2,
      "key": "injection_time",
-     "name": "Injection time",
+     "name": "Injection time (unconfirmed)",
      "unit": "ms",
      "value_type": "number",
      "formula": {
       "type": "raw"
      },
-     "confidence": "medium",
-     "notes": "Wire formula 0x89 with NWb=50 -> ms = body x 0.5. VCDS showed 5.00 ms. SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then.",
+     "confidence": "low",
+     "notes": "SOURCE: VCDS-Lite screenshot only (zone 2 showed \"5.00 ms\" on this car) + the captured wire header formula 0x89. The MANUAL documents group 02 (>=1390) only as z3 battery / z4 intake-air; injection is not listed for this group. Unconfirmed until a live body capture.",
      "display": {
       "trip_card": true,
       "order": 45
@@ -677,58 +677,39 @@
       "type": "raw"
      },
      "confidence": "low"
-    },
-    {
-     "index": 2,
-     "key": "ignition_advance",
-     "name": "Ignition advance (ECU-reported)",
-     "unit": "°BTDC",
-     "value_type": "number",
-     "formula": {
-      "type": "raw"
-     },
-     "confidence": "low",
-     "notes": "Spec 6 (4-8) deg BTDC at ~2250 rpm in Basic Settings. ECU-reported only; timing is set mechanically by rotating the distributor. Validate on vehicle."
     }
    ]
   }
  },
  "dtc_catalog": {
-  "00281": "Vehicle Speed Sensor G68 - no signal",
-  "00512": "Hall sensor reference point / signal error",
-  "00513": "Engine Speed Sensor G28",
-  "00514": "Reference point sensor G4",
-  "00515": "Camshaft Position (Hall) Sensor G40 - no signal (classic 2E stall fault, check distributor)",
-  "00516": "Idle switch F60",
-  "00517": "Full throttle switch F81",
+  "00281": "Vehicle Speed Sensor G68 - no signal [generic VAG — unverified for 2E]",
+  "00512": "Hall sensor reference point / signal error [generic VAG — unverified for 2E]",
+  "00513": "Engine Speed Sensor G28 [generic VAG — unverified for 2E]",
+  "00514": "Reference point sensor G4 [generic VAG — unverified for 2E]",
+  "00515": "Camshaft Position (Hall) Sensor G40 - no signal (classic 2E stall fault, check distributor) [generic VAG — unverified for 2E]",
   "00518": "Throttle Position Sensor G69",
-  "00519": "Intake Manifold Pressure Sensor",
-  "00520": "Air Flow Meter G70/G19 (2E: vane AFM)",
-  "00521": "CO potentiometer G74",
+  "00520": "Air Flow Meter G19/G19 (2E: vane AFM) [generic VAG — unverified for 2E]",
   "00522": "Coolant Temperature Sensor G62 - open/short (symptom: 1200-3000 rpm warm-start idle)",
   "00523": "Intake Air Temperature Sensor G42",
   "00524": "Knock Sensor 1 (G61)",
   "00525": "Oxygen (Lambda) Sensor G39",
-  "00526": "Knock Sensor 2 (G66)",
-  "00527": "Intake Air Temperature Sensor (G42)",
-  "00528": "Reference Mark / TDC Sensor",
-  "00530": "Throttle positioner potentiometer G88",
+  "00526": "Knock Sensor 2 (G66) [generic VAG — unverified for 2E]",
+  "00527": "Intake Air Temperature Sensor (G42) [generic VAG — unverified for 2E]",
+  "00528": "Reference Mark / TDC Sensor [generic VAG — unverified for 2E]",
   "00532": "Supply Voltage B+ too low/high",
-  "00533": "Idle Speed Regulation adaptation limit",
-  "00537": "Lambda Regulation at limit",
-  "00540": "Knock Control",
-  "00543": "Maximum engine speed exceeded",
+  "00533": "Idle Speed Regulation adaptation limit [generic VAG — unverified for 2E]",
+  "00537": "Lambda Regulation at limit [generic VAG — unverified for 2E]",
+  "00540": "Knock Control [generic VAG — unverified for 2E]",
+  "00543": "Maximum engine speed exceeded [generic VAG — unverified for 2E]",
   "00545": "Engine-gearbox electrical connection",
-  "00549": "Consumption signal",
-  "00552": "Mass Air Flow Sensor (G70)",
-  "00553": "Air Mass Sensor",
-  "00554": "Oxygen Sensor / Lambda Control",
-  "00555": "Oxygen (Lambda) Sensor (G39)",
-  "00560": "Mixture Adaptation",
-  "00561": "Mixture Adaptation limit",
-  "00575": "Intake Manifold Pressure",
-  "00577": "Knock Control Cylinder 1",
-  "01025": "Malfunction Indicator Lamp (MIL)",
+  "00549": "Consumption signal [generic VAG — unverified for 2E]",
+  "00552": "Air mass meter G19 (manual p.4: 2323)",
+  "00554": "Oxygen Sensor / Lambda Control [generic VAG — unverified for 2E]",
+  "00555": "Oxygen (Lambda) Sensor (G39) [generic VAG — unverified for 2E]",
+  "00560": "Mixture Adaptation [generic VAG — unverified for 2E]",
+  "00561": "Mixture Adaptation limit [generic VAG — unverified for 2E]",
+  "00577": "Knock Control Cylinder 1 [generic VAG — unverified for 2E]",
+  "01025": "Malfunction Indicator Lamp (MIL) [generic VAG — unverified for 2E]",
   "65535": "Internal Control Module Memory Error (ECU defective)"
  }
 }

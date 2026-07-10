@@ -41,6 +41,9 @@ object Kwp1281Protocol {
             // Type 10 is a boolean flag (warm-up), not a number.
             if (type == 0x0A) return if (b != 0) "WARM" else "COLD"
             val v = value()
+            // Ignition-angle types carry their direction as a label (gmenounos).
+            if (v != null && type == 4) return formatNumber(v) + if (b > 127) " ATDC" else " BTDC"
+            if (v != null && type == 27) return formatNumber(v) + if (b < 128) " ATDC" else " BTDC"
             return v?.let { formatNumber(it) } ?: "$a/$b"
         }
 
@@ -53,7 +56,7 @@ object Kwp1281Protocol {
             1 -> 0.2 * a * b                          // rpm
             2 -> 0.002 * a * b                        // %
             3 -> 0.002 * a * b                        // deg
-            4 -> (b - 127) * a * -0.01                // deg BTDC/ATDC (SIGNED)
+            4 -> Math.abs(b - 127) * 0.01 * a         // deg, direction in display() (gmenounos: ATDC if b>127)
             5 -> (b - 100) * 0.1 * a                  // °C
             6 -> 0.001 * a * b                        // V
             7 -> 0.01 * a * b                         // km/h
@@ -73,9 +76,9 @@ object Kwp1281Protocol {
             22 -> 0.001 * a * b                       // ms
             23 -> a * b / 256.0                       // %
             24 -> 0.001 * a * b                       // A
-            25 -> (256 * b + a) / 180.0 // DISPUTED: KaPoder uses 1.421*b + a/182; no authority — unused by the 2E               // g/s
+            25 -> 1.421 * b + a / 182.0               // g/s (gmenounos SensorValue.cs:49 + blafusel — arbiter)
             26 -> (b - a).toDouble()                  // °C
-            27 -> (b - 128) * a * 0.01                // deg (SIGNED)
+            27 -> Math.abs(b - 128) * 0.01 * a        // deg, direction in display() (gmenounos: ATDC if b<128)
             28 -> (b - a).toDouble()
             // 29 flag -> raw
             30 -> a * b / 12.0                         // deg k/w
@@ -87,7 +90,7 @@ object Kwp1281Protocol {
             36 -> (a * 256 + b) * 10.0                 // km
             37 -> b.toDouble()
             38 -> (b - 128) * a * 0.001                // deg k/w
-            39 -> a * b / 255.0 // DISPUTED: KaPoder divides by 256; unused by the 2E                        // mg/h
+            39 -> a * b / 256.0                        // mg/h (gmenounos SensorValue.cs:63: B/256*A)
             40 -> (a * 255 + b - 4000) * 0.1           // A
             41 -> (a * 255 + b).toDouble()             // Ah
             42 -> (a * 255 + b - 4000) * 0.1           // kW

@@ -35,17 +35,16 @@ class Kwp1281ProtocolTest {
     }
 
     @Test
-    fun `ignition angle type 4 is signed BTDC`() {
-        // type 4 = (b-127)*a*-0.01 (SIGNED). a=100, b=117 -> (-10)*100*-0.01 = 10.0
-        assertEquals("10", Kwp1281Protocol.decodeGroup(1, byteArrayOf(4, 100.toByte(), 117.toByte()))[0].raw)
-        // a=100, b=137 -> (10)*100*-0.01 = -10.0 (retard past reference)
-        assertEquals("-10", Kwp1281Protocol.decodeGroup(1, byteArrayOf(4, 100.toByte(), 137.toByte()))[0].raw)
+    fun `ignition angle type 4 is magnitude with direction label`() {
+        // gmenounos SensorValue.cs:28: abs(b-127)*0.01*a, ATDC when b>127.
+        assertEquals("10 BTDC", Kwp1281Protocol.decodeGroup(1, byteArrayOf(4, 100.toByte(), 117.toByte()))[0].raw)
+        assertEquals("10 ATDC", Kwp1281Protocol.decodeGroup(1, byteArrayOf(4, 100.toByte(), 137.toByte()))[0].raw)
     }
 
     @Test
-    fun `type 27 idle angle is signed around 128`() {
-        // (b-128)*a*0.01. a=100, b=118 -> -10.0
-        assertEquals("-10", Kwp1281Protocol.decodeGroup(1, byteArrayOf(27, 100.toByte(), 118.toByte()))[0].raw)
+    fun `type 27 idle angle is magnitude with direction label`() {
+        // gmenounos: abs(b-128)*0.01*a, ATDC when b<128.
+        assertEquals("10 ATDC", Kwp1281Protocol.decodeGroup(1, byteArrayOf(27, 100.toByte(), 118.toByte()))[0].raw)
     }
 
     @Test
