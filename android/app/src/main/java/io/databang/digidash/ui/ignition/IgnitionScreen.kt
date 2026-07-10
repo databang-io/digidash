@@ -247,6 +247,53 @@ private fun RpmTargetIndicator(rpm: Double?, onTarget: Boolean) {
     }
 }
 
+/**
+ * Decode the group-001 zone-4 test-condition bitfield per the official 2E
+ * workshop manual (p36): the ECU only enters its check/adjust mode when all
+ * bits are clear (display 00000000). Bit positions are numbered from the LEFT
+ * of the binary string, matching the manual's notation.
+ */
+@Composable
+private fun ConditionBitsPanel(bits: String) {
+    // MANUAL p36: position (from left) -> blocking condition when set.
+    val conditions = listOf(
+        1 to "Automatic gearbox signal not OK",
+        2 to "A/C not switched off",
+        5 to "Throttle valve not closed",
+        6 to "Engine speed outside permitted range",
+        7 to "Coolant temperature below 85 °C",
+    )
+    val allClear = bits.all { it == '0' }
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Test conditions ", style = MaterialTheme.typography.titleSmall)
+            Text(
+                bits,
+                style = MaterialTheme.typography.titleSmall,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                color = if (allClear) StatusColors.normal else StatusColors.warning,
+            )
+        }
+        if (allClear) {
+            Text(
+                "✓ 00000000 — ECU in check/adjust mode (all conditions satisfied)",
+                style = MaterialTheme.typography.bodySmall,
+                color = StatusColors.normal,
+            )
+        } else {
+            conditions.forEach { (pos, label) ->
+                val blocking = bits.getOrNull(pos) == '1'
+                Text(
+                    (if (blocking) "✗ " else "✓ ") + label,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (blocking) StatusColors.warning
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun ValueLine(
     byKey: Map<String, io.databang.digidash.domain.model.DashboardCardState>,
@@ -354,6 +401,10 @@ private fun BasicSettingsCard(
                     style = MaterialTheme.typography.titleSmall,
                 )
             }
+
+            // Group-001 zone-4 condition bits, decoded per the official manual
+            // (p36): all clear = the ECU is in its check/adjust mode.
+            ign.conditionBits?.let { ConditionBitsPanel(it) }
 
             if (ign.basicSettingsActive) {
                 RpmTargetIndicator(ign.basicRpm, ign.rpmOnTarget)

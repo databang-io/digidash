@@ -93,6 +93,9 @@ data class IgnitionState(
     val noThrottleFault: Boolean = false,
     val basicSettingsSupported: Boolean = false,
     val basicSettingsActive: Boolean = false,
+    /** Group-001 zone-4 condition bitfield as a binary string (e.g. "00000010"),
+     *  per the official manual: 00000000 = ECU in check/adjust mode. */
+    val conditionBits: String? = null,
     /** Live RPM/advance while in Basic Settings (from the polled adjustment group). */
     val basicRpm: Double? = null,
     val basicAdvance: Double? = null,
@@ -728,6 +731,8 @@ class AppViewModel(
             // is validated on the vehicle (ticket 14).
             basicSettingsSupported = !container.useRealBackend,
             basicSettingsActive = basicSettingsActive,
+            conditionBits = measurements["status_bits"]?.rawString
+                ?.takeIf { it.length == 8 && it.all { c -> c == '0' || c == '1' } },
             basicRpm = value("rpm_g11", "rpm", "rpm_000"),
             basicAdvance = value("ignition_advance"),
         )
