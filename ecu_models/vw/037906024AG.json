@@ -97,7 +97,7 @@
     },
     {
      "index": 5,
-     "key": "lambda_signal",
+     "key": "lambda_raw_000",
      "name": "Lambda (O2S) raw",
      "unit": "",
      "value_type": "number",
@@ -106,11 +106,7 @@
      },
      "confidence": "medium",
      "notes": "SOURCE label-037906023(sibling): z5 O2S, must VARY >=14 counts when active; 164-168=cold/open per label. MEASURED: stuck 56-57, probe disconnected — NEVER seen varying; volts scale UNKNOWN (former /128 fit retracted). Diag = oscillation, not absolute value.",
-     "critical": true,
-     "display": {
-      "trip_card": true,
-      "order": 60
-     }
+     "critical": true
     },
     {
      "index": 6,
@@ -156,7 +152,7 @@
     },
     {
      "index": 9,
-     "key": "injection_time",
+     "key": "injection_raw_000",
      "name": "Injection (raw)",
      "unit": "",
      "value_type": "number",
@@ -164,11 +160,7 @@
       "type": "raw"
      },
      "confidence": "medium",
-     "notes": "SOURCE label-037906023(sibling): z9 obs 003 warm idle; MEASURED 3-5 idle, blips on throttle, 10 engine off. Likely injection-related but UNIT UNVERIFIED — raw counts, no ms claimed.",
-     "display": {
-      "trip_card": true,
-      "order": 45
-     }
+     "notes": "SOURCE label-037906023(sibling): z9 obs 003 warm idle; MEASURED 3-5 idle, blips on throttle, 10 engine off. Likely injection-related but UNIT UNVERIFIED — raw counts, no ms claimed."
     },
     {
      "index": 10,
@@ -187,7 +179,7 @@
   "001": {
    "label": "Idling check: rpm / coolant / lambda / conditions",
    "polling_priority": "trip",
-   "source_note": "VW Golf/Vento 2E workshop manual ed. 04.1993 (prog level >=1390; ours is 1576)",
+   "source_note": "SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then.",
    "fields": [
     {
      "index": 1,
@@ -198,7 +190,7 @@
      "formula": {
       "type": "raw"
      },
-     "confidence": "high",
+     "confidence": "medium",
      "critical": true,
      "thresholds": {
       "normal": {
@@ -213,7 +205,7 @@
        "min": 6300
       }
      },
-     "notes": "Official idle spec 770-870 rpm; governed speed 6400-6500 rpm"
+     "notes": "Wire formula 0x8B (RPM): body byte interpolated over the 17-byte header table x NWb(26). SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then."
     },
     {
      "index": 2,
@@ -224,7 +216,7 @@
      "formula": {
       "type": "raw"
      },
-     "confidence": "high",
+     "confidence": "medium",
      "critical": true,
      "display": {
       "trip_card": true,
@@ -243,7 +235,7 @@
        "min": 115
       }
      },
-     "notes": "Manual: checks require >85 °C; -40 °C = open circuit in sender G62; jumps of 2-5 °C = control unit fault"
+     "notes": "Wire formula 0x8C (temperature): table-interpolated minus NWb(40) -> real °C. VCDS showed 90°C hot. SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then."
     },
     {
      "index": 3,
@@ -254,8 +246,12 @@
      "formula": {
       "type": "raw"
      },
-     "confidence": "high",
-     "notes": "Manual: must fluctuate by more than 0.3 V after 1 min at 2500 rpm; 0.00 V = earth/connector, 0.45 V steady with connector separated = renew probe G39"
+     "confidence": "medium",
+     "notes": "Wire formula 0x85 with NWb=2 -> volts = body/128. VCDS showed 1.22 V with the probe disconnected (matches label 023 open-circuit 164-168 counts). Healthy control must fluctuate >0.3 V at warm idle (MANUAL p37). SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then.",
+     "display": {
+      "trip_card": true,
+      "order": 60
+     }
     },
     {
      "index": 4,
@@ -266,15 +262,15 @@
      "formula": {
       "type": "raw"
      },
-     "confidence": "high",
-     "notes": "00000000 = check conditions satisfied. 01000000 auto-gearbox signal not OK; 00100000 A/C not off; 00000100 throttle not closed; 00000010 engine speed outside range; 00000001 coolant below 85 °C"
+     "confidence": "medium",
+     "notes": "Wire formula 0x88 (switch bits, mask NWb=0xFF). MANUAL: 00000000 = check conditions satisfied. SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then."
     }
    ]
   },
   "002": {
    "label": "Supply: battery voltage / intake air temperature",
    "polling_priority": "garage",
-   "source_note": "VW Golf/Vento 2E workshop manual ed. 04.1993 (prog level >=1390; ours is 1576)",
+   "source_note": "SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then.",
    "fields": [
     {
      "index": 1,
@@ -285,20 +281,24 @@
      "formula": {
       "type": "raw"
      },
-     "confidence": "low",
-     "notes": "Zone 1 not documented in manual; likely engine speed"
+     "confidence": "medium",
+     "notes": "Wire formula 0x8B (RPM), same table as group 1. SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then."
     },
     {
      "index": 2,
-     "key": "raw_002_2",
-     "name": "Raw field 002/2",
-     "unit": "",
+     "key": "injection_time",
+     "name": "Injection time",
+     "unit": "ms",
      "value_type": "number",
      "formula": {
       "type": "raw"
      },
-     "confidence": "low",
-     "notes": "Zone 2 not documented in manual"
+     "confidence": "medium",
+     "notes": "Wire formula 0x89 with NWb=50 -> ms = body x 0.5. VCDS showed 5.00 ms. SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then.",
+     "display": {
+      "trip_card": true,
+      "order": 45
+     }
     },
     {
      "index": 3,
@@ -309,7 +309,7 @@
      "formula": {
       "type": "raw"
      },
-     "confidence": "high",
+     "confidence": "medium",
      "critical": true,
      "display": {
       "trip_card": true,
@@ -328,7 +328,7 @@
        "max": 10.5
       }
      },
-     "notes": "Manual: approx. battery voltage, constant; fluctuation = renew current supply relay J176"
+     "notes": "Wire formula 0x85 with NWb=24 -> volts = body x 24/256. VCDS showed 12.38 V engine off. Cross-check against the adapter FC voltage. SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then."
     },
     {
      "index": 4,
@@ -339,12 +339,12 @@
      "formula": {
       "type": "raw"
      },
-     "confidence": "high",
+     "confidence": "medium",
      "display": {
       "trip_card": true,
       "order": 40
      },
-     "notes": "Manual: must drop when sender G42 sprayed with refrigerant"
+     "notes": "Wire formula 0x8C (temperature) minus NWb(40). VCDS showed 40°C intake air. SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then."
     }
    ]
   },

@@ -143,6 +143,95 @@ object Kwp1281Protocol {
         return fields
     }
 
+    // --- Header+body measuring format (old Digifant; SOURCE KLineKWP1281Lib) ---
+    // 0x29 <g> is answered by a GROUP HEADER (title 0x02): per-zone records
+    // [formula, NWb, tableLen, table...]; an immediate second 0x29 <g> returns
+    // the GROUP BODY (title 0xF4): one MWb byte per zone. Formulas 0x8B/0x8C/
+    // 0x93 interpolate MWb over the 17-byte table; others use (formula,NWb,MWb).
+    const val TITLE_GROUP_HEADER = 0x02
+
+    class HeaderRecord(val formula: Int, val nwb: Int, val table: ByteArray)
+
+    fun parseGroupHeader(data: ByteArray): List<HeaderRecord> {
+        val recs = mutableListOf<HeaderRecord>()
+        var i = 0
+        while (i + 2 < data.size) {
+            val f = data[i].toInt() and 0xFF
+            val n = data[i + 1].toInt() and 0xFF
+            val len = data[i + 2].toInt() and 0xFF
+            val end = i + 3 + len
+            if (end > data.size) break
+            recs.add(HeaderRecord(f, n, data.copyOfRange(i + 3, end)))
+            i = end
+        }
+        return recs
+    }
+
+    /** Value of one header+body zone (KLineKWP1281Lib algorithm, verbatim). */
+    fun headerBodyValue(rec: HeaderRecord, mwb: Int): Double? = when (rec.formula) {
+        0x8B, 0x8C, 0x93 -> {
+            if (rec.table.size != 17) null else {
+                val idx = (mwb / 16).coerceAtMost(15)
+                val mapByte = rec.table[idx].toInt() and 0xFF
+                val diff = (rec.table[idx + 1].toInt() and 0xFF) - mapByte
+                val res = mapByte + diff * (mwb % 16) / 16.0
+                if (rec.formula == 0x8B) res * rec.nwb else res - rec.nwb
+            }
+        }
+        else -> highFormulaValue(rec.formula, rec.nwb, mwb)
+    }
+
+    /** Standard formulas >=0x80 (SOURCE KLineKWP1281Lib getMeasurementValue). */
+    fun highFormulaValue(k: Int, a: Int, b: Int): Double? = when (k) {
+        0x80, 0x86, 0x87, 0x9A -> (a * b).toDouble()
+        0x81, 0x85 -> a * b / 256.0
+        0x82 -> a * b / 2560.0
+        0x83 -> a * b * 0.5 - 30
+        0x84 -> a * b * 0.5
+        0x88 -> (b and a).toDouble()
+        0x89, 0x90, 0x91 -> a * b * 0.01
+        0x8A -> a * b * 0.001
+        0x8F, 0x97 -> (b - 128) * a * 0.01
+        0x92 -> 1 + (b - 128) * a * 0.0001
+        0x94 -> (b - 128) * a * 0.25
+        0x95 -> (b - 100) * a * 0.1
+        0x96 -> (256 * b + a) / 180.0
+        0x98 -> a * b * 0.025
+        0x99 -> (b - 128) * a / 255.0
+        0x9B -> a * b * 0.01 - 90
+        else -> if (k in 1..0x7F) Kw1281Field(k, a, b).value() else null
+    }
+
+    fun headerBodyUnit(formula: Int): String = when (formula) {
+        0x80, 0x8B -> "rpm"
+        0x81, 0x93 -> "%"
+        0x82 -> "A"
+        0x83, 0x84, 0x8F, 0x9A, 0x9B -> "°"
+        0x85, 0x8A -> "V"
+        0x86 -> "km/h"
+        0x89 -> "ms"
+        0x8C, 0x95 -> "°C"
+        0x90 -> "l/h"
+        0x96 -> "g/s"
+        0x98 -> "mg"
+        else -> ""
+    }
+
+    /** Decode a header+body pair into per-zone fields (bits shown as binary). */
+    fun decodeHeaderBody(header: ByteArray, body: ByteArray): List<RawField> {
+        val recs = parseGroupHeader(header)
+        return recs.mapIndexed { i, rec ->
+            val mwb = body.getOrNull(i)?.toInt()?.and(0xFF)
+            val display = when {
+                mwb == null -> "N/A"
+                rec.formula == 0x88 ->
+                    Integer.toBinaryString(mwb and rec.nwb).padStart(8, '0')
+                else -> headerBodyValue(rec, mwb)?.let { formatNumber(it) } ?: "$mwb"
+            }
+            RawField(index = i + 1, raw = display)
+        }
+    }
+
     /** Group 000: up to 10 raw bytes, no data types. */
     fun decodeGroup000(data: ByteArray): List<RawField> =
         data.take(10).mapIndexed { i, b -> RawField(index = i + 1, raw = (b.toInt() and 0xFF).toString()) }

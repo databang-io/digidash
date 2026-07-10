@@ -58,7 +58,7 @@ private val gaugeRanges = mapOf(
     "injection_time" to GaugeRange(0.0, 20.0),
     "engine_load" to GaugeRange(0.0, 100.0),
     "throttle_angle" to GaugeRange(0.0, 90.0),
-    "lambda_signal" to GaugeRange(0.0, 100.0),
+    "lambda_signal" to GaugeRange(0.0, 1.3), // volts (wire formula 0x85/128)
     "ignition_advance" to GaugeRange(-10.0, 50.0),
     "rpm_000" to GaugeRange(0.0, 7000.0),
 )

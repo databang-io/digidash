@@ -136,6 +136,10 @@ class Kwp1281Session(
         val keepAcks: Boolean = false,
         /** Blocks to collect before giving up on a non-matching reply. */
         val giveUpBlocks: Int = 5,
+        /** Sent IMMEDIATELY after this command's delivery, in the same turn
+         *  slot (no intervening ACK) — required by the header/body group
+         *  format where an ACK resets the ECU's header->body alternation. */
+        val followUp: PendingCommand? = null,
     ) {
         val response = java.util.concurrent.SynchronousQueue<List<Block>>()
     }
@@ -182,7 +186,15 @@ class Kwp1281Session(
                     }
                     if (pending.terminal(ecuBlock) || pendingBlocks >= pending.giveUpBlocks) {
                         pending.response.offer(collected.toList())
+                        val chained = pending.followUp
                         collected.clear(); pending = null; pendingBlocks = 0
+                        if (chained != null) {
+                            // Use our transmit turn for the follow-up request
+                            // instead of an ACK, then wait for the ECU's reply.
+                            sendBlock(chained.title, chained.data)
+                            pending = chained
+                            continue
+                        }
                     }
                 }
                 // 3. Host transmits exactly once: a queued command or a keep-alive ACK.
@@ -333,42 +345,60 @@ class Kwp1281Session(
             // block (VCDS-style 0xE7 also accepted for other ECUs).
             accept = setOf(Kwp1281Protocol.TITLE_GROUP_RESPONSE, 0x02)
         }
-        val resp = exchange(reqTitle, reqData,
-            terminal = { it.title in accept || it.title == Kwp1281Protocol.TITLE_NO_DATA ||
-                (group != 0 && it.data.size == 12) })
-        // A typed 4-triplet reply (12 data bytes) is valid measuring data
-        // REGARDLESS of its title (KaPoder 1200-baud rule) — old firmwares
-        // answer with non-standard titles.
-        val typed = resp.firstOrNull {
-            it.title == Kwp1281Protocol.TITLE_GROUP_RESPONSE || (group != 0 && it.data.size == 12)
+        if (group == 0) {
+            val resp = exchange(reqTitle, reqData,
+                terminal = { it.title in accept || it.title == Kwp1281Protocol.TITLE_NO_DATA })
+            val block = resp.firstOrNull { it.title in accept }
+                ?: error("no measuring response for group 0")
+            return@runCatching RawMeasuringBlock(
+                group = 0,
+                fields = Kwp1281Protocol.decodeGroup000(block.data),
+                timestampMillis = System.currentTimeMillis(),
+            )
         }
-        val block = typed ?: resp.firstOrNull { it.title in accept }
-            ?: error("no measuring response for group $group")
-        // This ECU answers numbered groups with a legacy title-0x02 46-byte block
-        // whose zone mapping is unknown. Decoding it as VAG 3-byte fields yields
-        // garbage values on real gauges — refuse instead (cards show N/A, rule 8)
-        // and let the poller retire the group. Group 000 (0xF4) is the live source.
-        if (typed == null && group != 0 && block.title == 0x02) {
-            error("group $group replies legacy 0x02 raw block — zone mapping uncalibrated")
+        // Numbered groups (SOURCE KLineKWP1281Lib): this ECU family answers
+        // 0x29 with a GROUP HEADER (0x02) and delivers the GROUP BODY (0xF4,
+        // one byte per zone) to an IMMEDIATE second 0x29 — an intervening ACK
+        // resets the alternation, hence the followUp chain.
+        if (!running) error("session not connected")
+        val nonAck: (Block) -> Boolean = { it.title != Kwp1281Protocol.TITLE_ACK }
+        val bodyCmd = PendingCommand(reqTitle, reqData, nonAck)
+        val headCmd = PendingCommand(reqTitle, reqData, nonAck, followUp = bodyCmd)
+        commandQueue.offer(headCmd)
+        val headResp = headCmd.response.poll(5000, java.util.concurrent.TimeUnit.MILLISECONDS)
+            ?: error("no header response for group $group")
+        val bodyResp = bodyCmd.response.poll(5000, java.util.concurrent.TimeUnit.MILLISECONDS)
+            ?: error("no body response for group $group")
+        val head = headResp.firstOrNull(nonAck) ?: error("empty header reply for group $group")
+        val fields = when {
+            // Modern ECU: direct typed triplets — body reply is a duplicate, ignore.
+            head.title == Kwp1281Protocol.TITLE_GROUP_RESPONSE || head.data.size == 12 ->
+                Kwp1281Protocol.decodeGroupResponse(head.data)
+            head.title == Kwp1281Protocol.TITLE_NO_DATA -> error("group $group not supported")
+            head.title == Kwp1281Protocol.TITLE_GROUP_HEADER -> {
+                val body = bodyResp.firstOrNull {
+                    it.title == Kwp1281Protocol.TITLE_RAW_DATA_RESPONSE ||
+                        it.title == Kwp1281Protocol.TITLE_GROUP_RESPONSE
+                } ?: error("no body after header for group $group (got ${bodyResp.map { it.title }})")
+                if (body.title == Kwp1281Protocol.TITLE_GROUP_RESPONSE)
+                    Kwp1281Protocol.decodeGroupResponse(body.data)
+                else Kwp1281Protocol.decodeHeaderBody(head.data, body.data)
+            }
+            else -> error("unexpected group $group reply title %02X".format(head.title))
         }
         RawMeasuringBlock(
             group = group,
-            fields = if (typed != null && group != 0)
-                Kwp1281Protocol.decodeGroupResponse(block.data)
-            else Kwp1281Protocol.decodeGroup(group, block.data),
+            fields = fields,
             timestampMillis = System.currentTimeMillis(),
         )
     }
 
     fun readDtc(): Result<List<RawDtc>> = runCatching {
-        // KaPoder/blafusel pattern: the ECU may spread codes over SEVERAL 0xFC
-        // blocks and signals "no more" with an ACK — collect until that ACK
-        // (delivering on the first block would drop codes beyond the first
-        // block on ECUs with many stored faults).
-        val resp = exchange(Kwp1281Protocol.TITLE_DTC_REQUEST, ByteArray(0),
-            keepAcks = true,
-            terminal = { it.title == Kwp1281Protocol.TITLE_ACK },
-            giveUpBlocks = 8)
+        // MEASURED on this ECU: all stored codes arrive in a single 0xFC block
+        // and the trailing ACK may never come — deliver on the first response.
+        // KNOWN LIMIT: an ECU with >4 stored faults may spread them over more
+        // 0xFC blocks (KaPoder loops until ACK); revisit live if >4 ever occur.
+        val resp = exchange(Kwp1281Protocol.TITLE_DTC_REQUEST, ByteArray(0))
         resp.filter { it.title == Kwp1281Protocol.TITLE_DTC_RESPONSE }
             .flatMap { Kwp1281Protocol.decodeDtcResponse(it.data) }
     }
