@@ -61,8 +61,10 @@ class DiagnosticSessionRepository(
     private val _basicSettingsActive = MutableStateFlow(false)
     val basicSettingsActive: StateFlow<Boolean> = _basicSettingsActive.asStateFlow()
 
-    /** Group polled while in Basic Settings (ignition advance readout). */
-    private val basicSettingsGroup = 11
+    /** Group polled while in Basic Settings (manual documents groups 01-04;
+     *  group 1 carries the condition bits + rpm/coolant/lambda). Used only by
+     *  the legacy fake-backend polling path. */
+    private val basicSettingsGroup = 1
 
     private val _lastError = MutableStateFlow<DiagnosticError?>(null)
     val lastError: StateFlow<DiagnosticError?> = _lastError.asStateFlow()
@@ -250,8 +252,20 @@ class DiagnosticSessionRepository(
 
     fun logUserNote(note: String) = emit(SessionEvent.UserNote(note))
 
-    /** Enter Basic Settings. Callers must confirm with the user first (safety). */
+    /** Enter Basic Settings. Callers must confirm with the user first (safety).
+     *  Real adapter: basic settings IS the continuous 0x28 stream (kw1281test —
+     *  the mode persists only while 0x28 requests keep arriving); no separate
+     *  enter opcode exists. Manual documents groups 01-04 (default 1: the
+     *  condition-bits + rpm/coolant/lambda group). */
     suspend fun enterBasicSettings(group: Int? = 0): Result<Unit> = sessionMutex.withLock {
+        val deepObd = client as? io.databang.digidash.core.deepobd.DeepObdDiagnosticClient
+        if (deepObd != null) {
+            val g = (group ?: 1).coerceAtLeast(1)
+            deepObd.configureMeasureStream(listOf(g), basicSettings = true)
+            _basicSettingsActive.value = true
+            emit(SessionEvent.BasicSettingsEntered)
+            return Result.success(Unit)
+        }
         client.enterBasicSettings(group)
             .onSuccess {
                 _basicSettingsActive.value = true
@@ -261,6 +275,24 @@ class DiagnosticSessionRepository(
     }
 
     suspend fun exitBasicSettings(): Result<Unit> = sessionMutex.withLock {
+        val deepObd = client as? io.databang.digidash.core.deepobd.DeepObdDiagnosticClient
+        if (deepObd != null) {
+            // Stop the 0x28 stream and resume normal 0x29 group reads; NEVER
+            // send 0x06 here (it ends the whole session). The next 0x29 read
+            // begins with a deliberate ACK, which also drops the ECU out of
+            // its adjust condition.
+            val model = _model.value
+            val tripGroups = model?.let { m ->
+                (m.groups.filter { (_, g) -> g.pollingPriority == "trip" }
+                    .keys.mapNotNull { it.toIntOrNull() } +
+                    m.tripCardFields().map { it.first })
+                    .distinct().sorted().filter { it !in deadGroups }
+            }.orEmpty()
+            deepObd.configureMeasureStream(tripGroups)
+            _basicSettingsActive.value = false
+            emit(SessionEvent.BasicSettingsExited)
+            return Result.success(Unit)
+        }
         client.exitBasicSettings()
             .onSuccess {
                 _basicSettingsActive.value = false
@@ -282,6 +314,40 @@ class DiagnosticSessionRepository(
         val tripGroups = (tripPriority + cardGroups).distinct().sorted()
         if (tripGroups.isEmpty()) return
 
+        // Real adapter: the session loop streams measurements continuously
+        // (the stream IS the keep-alive; commands preempt at body boundaries).
+        val deepObd = client as? io.databang.digidash.core.deepobd.DeepObdDiagnosticClient
+        if (deepObd != null) {
+            pollJob = scope.launch {
+                fun liveGroups() = tripGroups.filter { it !in deadGroups }
+                deepObd.configureMeasureStream(liveGroups())
+                launch {
+                    deepObd.groupFailures.collect { g ->
+                        val fails = (groupFailures[g] ?: 0) + 1
+                        groupFailures[g] = fails
+                        if (fails >= 2 && deadGroups.add(g)) {
+                            deepObd.configureMeasureStream(liveGroups())
+                        }
+                    }
+                }
+                launch {
+                    // Battery via the adapter's FC telegram; a queued command
+                    // that preempts the stream at a body boundary (~10 s cadence).
+                    while (isActive) {
+                        delay(10_000)
+                        deepObd.adapterVoltage()?.let { volts -> publishBatteryVoltage(volts) }
+                    }
+                }
+                deepObd.measurementFlow.collect { block ->
+                    val interpreted = interpreter.interpret(block, model)
+                    _measurements.value = _measurements.value +
+                        interpreted.measurements.associateBy { it.key }
+                    _lastError.value = null
+                }
+            }
+            return
+        }
+        // Fake/demo backend keeps the legacy request/response polling.
         pollJob = scope.launch {
             var i = 0
             while (isActive) {
@@ -316,34 +382,30 @@ class DiagnosticSessionRepository(
                             groupFailures[group] = fails
                             if (fails >= 2) deadGroups.add(group)
                         }
-                    // Battery from the ADAPTER's own FC voltage telegram (same
-                    // 12V rail as the OBD socket) — this ECU exposes no live
-                    // battery zone we can decode yet.
-                    if (i % 6 == 0) {
-                        (client as? io.databang.digidash.core.deepobd.DeepObdDiagnosticClient)
-                            ?.adapterVoltage()?.let { volts ->
-                                val status = when {
-                                    volts < 10.5 -> io.databang.digidash.domain.model.MeasurementStatus.CRITICAL
-                                    volts < 11.5 || volts > 15.5 -> io.databang.digidash.domain.model.MeasurementStatus.WARNING
-                                    else -> io.databang.digidash.domain.model.MeasurementStatus.NORMAL
-                                }
-                                val m = InterpretedMeasurement(
-                                    key = "battery_voltage",
-                                    name = "Battery voltage (adapter)",
-                                    group = 0, fieldIndex = 0,
-                                    rawString = null, value = volts,
-                                    displayValue = String.format(java.util.Locale.US, "%.1f", volts),
-                                    unit = "V", status = status,
-                                    confidence = "high",
-                                    timestampMillis = System.currentTimeMillis(),
-                                )
-                                _measurements.value = _measurements.value + (m.key to m)
-                            }
-                    }
                 }
                 delay(pollIntervalMillis)
             }
         }
+    }
+
+    /** Battery from the adapter's FC telegram — same 12V rail as the OBD socket. */
+    private fun publishBatteryVoltage(volts: Double) {
+        val status = when {
+            volts < 10.5 -> io.databang.digidash.domain.model.MeasurementStatus.CRITICAL
+            volts < 11.5 || volts > 15.5 -> io.databang.digidash.domain.model.MeasurementStatus.WARNING
+            else -> io.databang.digidash.domain.model.MeasurementStatus.NORMAL
+        }
+        val m = InterpretedMeasurement(
+            key = "battery_voltage",
+            name = "Battery voltage (adapter)",
+            group = 0, fieldIndex = 0,
+            rawString = null, value = volts,
+            displayValue = String.format(java.util.Locale.US, "%.1f", volts),
+            unit = "V", status = status,
+            confidence = "high",
+            timestampMillis = System.currentTimeMillis(),
+        )
+        _measurements.value = _measurements.value + (m.key to m)
     }
 
     private fun emit(event: SessionEvent) {

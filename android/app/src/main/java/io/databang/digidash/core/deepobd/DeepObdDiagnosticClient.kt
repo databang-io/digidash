@@ -96,6 +96,8 @@ class DeepObdDiagnosticClient(
                 idResult.exceptionOrNull()?.let { DiagnosticError.ProtocolError(it.message ?: "init failed") }
                     ?: DiagnosticError.EcuNoResponse)
         }
+        s.onMeasureBlock = { block -> _measurementFlow.tryEmit(block) }
+        s.onGroupFailure = { g -> _groupFailures.tryEmit(g) }
         session = s
         identity = parseIdentity(idResult.getOrDefault(emptyList()), info)
         state.value = ConnectionState.CONNECTED
@@ -155,6 +157,26 @@ class DeepObdDiagnosticClient(
     /** Battery voltage from the adapter's FC telegram, via the session loop. */
     suspend fun adapterVoltage(): Double? = withContext(Dispatchers.IO) {
         session?.readAdapterVoltage()?.getOrNull()
+    }
+
+    // --- Continuous measuring stream (session-loop driven; the stream IS the
+    // keep-alive while it runs). ---
+    private val _measurementFlow =
+        kotlinx.coroutines.flow.MutableSharedFlow<io.databang.digidash.domain.model.RawMeasuringBlock>(
+            extraBufferCapacity = 32)
+    val measurementFlow:
+        kotlinx.coroutines.flow.SharedFlow<io.databang.digidash.domain.model.RawMeasuringBlock> =
+        _measurementFlow
+
+    private val _groupFailures =
+        kotlinx.coroutines.flow.MutableSharedFlow<Int>(extraBufferCapacity = 16)
+    val groupFailures: kotlinx.coroutines.flow.SharedFlow<Int> = _groupFailures
+
+    /** Configure the measuring stream (empty list stops it). */
+    fun configureMeasureStream(groups: List<Int>, basicSettings: Boolean = false) {
+        session?.setMeasureStream(
+            if (groups.isEmpty()) null
+            else Kwp1281Session.StreamSpec(groups, basicSettings = basicSettings))
     }
 
     /** Debug: KaPoder-style group read with 0x00 resync between attempts. */

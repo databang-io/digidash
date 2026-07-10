@@ -118,6 +118,7 @@ class Kwp1281Session(
             }
             sendAck()
         }
+        invalidateMeasureState()
         // KWP1281 needs a continuous ACK keep-alive (<500 ms) or the ECU drops
         // the session; run the block exchange on a background loop that also
         // injects on-demand commands (group/DTC/basic-settings).
@@ -148,6 +149,131 @@ class Kwp1281Session(
     private var loopThread: Thread? = null
     private val commandQueue = java.util.concurrent.LinkedBlockingQueue<PendingCommand>()
 
+    // --- Continuous measuring stream (kw1281test model: the 0x29 polling loop
+    // IS the keep-alive; idle ACKs are suppressed while it runs). The ECU
+    // LATCHES header->body per connection: first 0x29 after any ACK/command
+    // returns the 0x02 header, subsequent back-to-back 0x29s return 0xF4
+    // bodies until an ACK resets the latch (KLineKWP1281Lib ex03/ex04).
+    class StreamSpec(
+        val groups: List<Int>,
+        val dwellBodies: Int = 4,
+        /** 0x28 basic-settings stream instead of 0x29 group reads. */
+        val basicSettings: Boolean = false,
+    )
+
+    @Volatile private var streamSpec: StreamSpec? = null
+    /** Emitted for every decoded measuring block from the stream. */
+    @Volatile var onMeasureBlock: ((RawMeasuringBlock) -> Unit)? = null
+    /** Emitted when a group is refused/undecodable (repository retires it). */
+    @Volatile var onGroupFailure: ((Int) -> Unit)? = null
+
+    private enum class Latch { RESET, ARMED, STREAMING }
+    private var latch = Latch.RESET
+    private var latchGroup = -1
+    private val headerCache = HashMap<Int, ByteArray>()
+    private var streamIdx = 0
+    private var bodiesLeft = 0
+    private var awaitingStream = false
+
+    /** Start/replace the continuous measuring stream (empty list stops it). */
+    fun setMeasureStream(spec: StreamSpec?) {
+        streamSpec = spec?.takeIf { it.groups.isNotEmpty() }
+        streamIdx = 0
+        bodiesLeft = spec?.dwellBodies ?: 0
+    }
+
+    private fun invalidateMeasureState() {
+        headerCache.clear()
+        latch = Latch.RESET
+        latchGroup = -1
+        awaitingStream = false
+    }
+
+    /** Host TX slot for the stream. Returns true if the turn was used. */
+    private fun sendStreamRequest(spec: StreamSpec): Boolean {
+        val g = spec.groups[streamIdx % spec.groups.size]
+        if (g == 0) {
+            // Group 0 = param-less raw display (0x12 -> 0xF4 10 bytes); it is a
+            // non-0x29 command, so the latch resets for the next group.
+            sendBlock(Kwp1281Protocol.TITLE_RAW_DATA_REQUEST, ByteArray(0))
+            latch = Latch.RESET; latchGroup = -1
+            awaitingStream = true
+            return true
+        }
+        if (latch == Latch.RESET && latchGroup != g) {
+            // Group switch / post-command: one deliberate ACK so the next 0x29
+            // is guaranteed to yield a fresh header (latch is per-connection).
+            sendAck()
+            latchGroup = g
+            return true
+        }
+        val title = if (spec.basicSettings) Kwp1281Protocol.TITLE_BASIC_SETTING
+        else Kwp1281Protocol.TITLE_GROUP_REQUEST
+        sendBlock(title, byteArrayOf(g.toByte()))
+        awaitingStream = true
+        return true
+    }
+
+    /** Dispatch a stream response strictly by TITLE (never positionally). */
+    private fun handleStreamBlock(spec: StreamSpec, b: Block) {
+        awaitingStream = false
+        val g = spec.groups[streamIdx % spec.groups.size]
+        fun advance() {
+            streamIdx++
+            bodiesLeft = spec.dwellBodies
+        }
+        fun emit(fields: List<RawField>) {
+            onMeasureBlock?.invoke(RawMeasuringBlock(g, fields, System.currentTimeMillis()))
+        }
+        when {
+            b.title == Kwp1281Protocol.TITLE_GROUP_HEADER -> {
+                // Cache/refresh reactively (kw1281test discipline) and spend the
+                // next TX turn re-requesting the same group for its body.
+                headerCache[g] = b.data
+                latch = Latch.ARMED; latchGroup = g
+            }
+            b.title == Kwp1281Protocol.TITLE_RAW_DATA_RESPONSE && g == 0 -> {
+                emit(Kwp1281Protocol.decodeGroup000(b.data))
+                if (--bodiesLeft <= 0) advance()
+            }
+            b.title == Kwp1281Protocol.TITLE_RAW_DATA_RESPONSE && b.data.size <= 4 -> {
+                val head = headerCache[g]
+                if (head == null) {
+                    // Body with no cached header (e.g. latch survived a group
+                    // switch): never decode against the wrong header.
+                    latch = Latch.RESET; latchGroup = -1
+                } else {
+                    emit(Kwp1281Protocol.decodeHeaderBody(head, b.data))
+                    latch = Latch.STREAMING; latchGroup = g
+                    if (--bodiesLeft <= 0) advance()
+                }
+            }
+            b.title == Kwp1281Protocol.TITLE_RAW_DATA_RESPONSE && b.data.size == 10 -> {
+                // Basic-settings / group-0 style raw display.
+                emit(Kwp1281Protocol.decodeGroup000(b.data))
+                latch = Latch.RESET
+                if (--bodiesLeft <= 0) advance()
+            }
+            b.title == Kwp1281Protocol.TITLE_GROUP_RESPONSE || b.data.size == 12 -> {
+                emit(Kwp1281Protocol.decodeGroupResponse(b.data))
+                latch = Latch.STREAMING; latchGroup = g
+                if (--bodiesLeft <= 0) advance()
+            }
+            b.title == Kwp1281Protocol.TITLE_NO_DATA || b.title == Kwp1281Protocol.TITLE_ACK -> {
+                // Refused / empty group: non-fatal, retire via callback.
+                onGroupFailure?.invoke(g)
+                latch = Latch.RESET; latchGroup = -1
+                advance()
+            }
+            else -> {
+                // Unexpected title: abort this read only; alternation is intact
+                // because the block was consumed.
+                android.util.Log.i(TAG, "kwp: stream unexpected title %02X for group %d".format(b.title, g))
+                latch = Latch.RESET; latchGroup = -1
+            }
+        }
+    }
+
     private fun startLoop() {
         running = true
         loopThread = Thread {
@@ -174,6 +300,28 @@ class Kwp1281Session(
                     continue
                 }
                 misses = 0
+                // 2a. A stream request in flight and no queued command pending:
+                //     this block is the stream's response.
+                val specNow = streamSpec
+                if (pending == null && awaitingStream && specNow != null) {
+                    handleStreamBlock(specNow, ecuBlock)
+                    // Host transmit turn.
+                    val next = commandQueue.poll()
+                    if (next != null) {
+                        // Commands preempt at body boundaries and reset the latch.
+                        invalidateMeasureState()
+                        if (next.title == TITLE_ADAPTER_VOLTAGE) {
+                            handleAdapterVoltage(next)
+                        } else {
+                            sendBlock(next.title, next.data); pending = next
+                            collected.clear(); pendingBlocks = 0
+                        }
+                    } else {
+                        val sp = streamSpec
+                        if (sp != null) sendStreamRequest(sp) else sendAck()
+                    }
+                    continue
+                }
                 // 2. Deliver to a waiting command (skipping keep-alive ACKs so an
                 //    ACK-first reply isn't mistaken for the answer). CRITICAL: give
                 //    up after a few blocks if the terminal never matches — else a
@@ -200,20 +348,17 @@ class Kwp1281Session(
                 // 3. Host transmits exactly once: a queued command or a keep-alive ACK.
                 if (pending == null) {
                     val next = commandQueue.poll()
+                    if (next != null) invalidateMeasureState()
+                    if (next == null) {
+                        val sp = streamSpec
+                        if (sp != null && !awaitingStream) {
+                            sendStreamRequest(sp)
+                            continue
+                        }
+                    }
                     if (next != null) {
                         if (next.title == TITLE_ADAPTER_VOLTAGE) {
-                            // Adapter-local telegram (never reaches the ECU): the
-                            // loop owns the transport, so run it between blocks
-                            // and keep the ECU alive with a normal ACK after.
-                            val raw = runCatching {
-                                transport.write(AdapterProtocol.READ_VOLTAGE)
-                                val r = transport.read(64, 800)
-                                if (r.size < 6) null else (r[r.size - 2].toInt() and 0xFF)
-                            }.getOrNull()
-                            next.response.offer(
-                                if (raw == null) emptyList()
-                                else listOf(Block(0, TITLE_ADAPTER_VOLTAGE, byteArrayOf(raw.toByte()))))
-                            sendAck()
+                            handleAdapterVoltage(next)
                         } else {
                             sendBlock(next.title, next.data); pending = next
                             collected.clear(); pendingBlocks = 0
@@ -448,6 +593,20 @@ class Kwp1281Session(
         running = false
         loopThread?.interrupt()
         loopThread = null
+    }
+
+    /** Adapter-local telegram (never reaches the ECU): the loop owns the
+     *  transport, so run it between blocks and ACK to keep the ECU alive. */
+    private fun handleAdapterVoltage(cmd: PendingCommand) {
+        val raw = runCatching {
+            transport.write(AdapterProtocol.READ_VOLTAGE)
+            val r = transport.read(64, 800)
+            if (r.size < 6) null else (r[r.size - 2].toInt() and 0xFF)
+        }.getOrNull()
+        cmd.response.offer(
+            if (raw == null) emptyList()
+            else listOf(Block(0, TITLE_ADAPTER_VOLTAGE, byteArrayOf(raw.toByte()))))
+        sendAck()
     }
 
     private fun sendAck() {
