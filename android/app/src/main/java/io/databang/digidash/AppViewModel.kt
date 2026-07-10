@@ -34,6 +34,8 @@ data class AppUiState(
     val dashboardEditMode: Boolean = false,
     /** Card selected in edit mode (shows its size control). */
     val selectedCardKey: String? = null,
+    /** Measurement keys the user pinned to the dashboard from the groups view. */
+    val pinnedCards: Set<String> = emptySet(),
     /** Latest measurements grouped by measuring block for the Tech screen. */
     val techGroups: List<TechGroup> = emptyList(),
     val dtcCount: Int? = null,
@@ -129,6 +131,22 @@ class AppViewModel(
                 val (k, v) = entry.split(":").let { if (it.size == 2) it[0] to it[1] else return@mapNotNull null }
                 runCatching { k to io.databang.digidash.domain.model.CardSize.valueOf(v) }.getOrNull()
             }?.toMap()?.toMutableMap() ?: mutableMapOf()
+
+    /** Measurement keys the user pinned to the dashboard (groups view). */
+    private val pinnedCards: MutableSet<String> =
+        container.prefs.getString(AppContainer.PREF_PINNED_CARDS, null)
+            ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+            ?.toMutableSet() ?: mutableSetOf()
+
+    /** Pin/unpin a measurement as a dashboard tile (VCDS-style groups view). */
+    fun togglePinnedCard(key: String) {
+        if (!pinnedCards.add(key)) pinnedCards.remove(key)
+        container.prefs.edit()
+            .putString(AppContainer.PREF_PINNED_CARDS, pinnedCards.joinToString(","))
+            .apply()
+        _ui.update { it.copy(pinnedCards = pinnedCards.toSet()) }
+        rebuildDerivedState(session.measurements.value)
+    }
 
     /** Size for a card: persisted override, else RPM/GPS default to a big gauge. */
     private fun sizeFor(key: String): io.databang.digidash.domain.model.CardSize =
@@ -555,6 +573,24 @@ class AppViewModel(
                     }
                 }
             }
+            // User-pinned measurements from the groups view (VCDS-style):
+            // any zone can become a dashboard tile.
+            val present = map { it.key }.toSet()
+            for (key in pinnedCards) {
+                if (key in present) continue
+                val m = measurements[key] ?: continue
+                add(
+                    DashboardCardState(
+                        key = m.key,
+                        title = m.name,
+                        valueText = m.displayValue,
+                        unit = m.unit,
+                        status = m.status,
+                        stale = now - m.timestampMillis > STALE_AFTER_MILLIS,
+                        lowConfidence = m.confidence != "high",
+                    )
+                )
+            }
             add(
                 when (val count = state.dtcCount) {
                     null -> DashboardCardState.unavailable("dtc_count", "DTC")
@@ -596,6 +632,9 @@ class AppViewModel(
         }
 
         val orderedCards = applyCardOrder(cards).map { it.copy(size = sizeFor(it.key)) }
+        if (state.pinnedCards != pinnedCards.toSet()) {
+            _ui.update { it.copy(pinnedCards = pinnedCards.toSet()) }
+        }
 
         val techGroups = measurements.values
             .groupBy { it.group }

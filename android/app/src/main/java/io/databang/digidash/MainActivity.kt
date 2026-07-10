@@ -229,6 +229,7 @@ fun DigiDashApp(container: AppContainer, sessionHolder: SessionHolder) {
                     onToggleCaptureRaw = viewModel::setCaptureRawTraffic,
                     onToggleReadOnly = viewModel::setReadOnlyMode,
                     onOpenCaptureWizard = { navController.navigate("capture-wizard") },
+                    onTogglePin = viewModel::togglePinnedCard,
                 )
             }
         }

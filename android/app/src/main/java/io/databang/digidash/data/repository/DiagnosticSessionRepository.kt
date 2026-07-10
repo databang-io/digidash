@@ -311,7 +311,11 @@ class DiagnosticSessionRepository(
             .filter { (_, group) -> group.pollingPriority == "trip" }
             .keys.mapNotNull { it.toIntOrNull() }
         val cardGroups = model.tripCardFields().map { it.first }
-        val tripGroups = (tripPriority + cardGroups).distinct().sorted()
+        // Typed groups (1-3: lambda V, battery V, injection ms, coolant/intake °C)
+        // lead the rotation; legacy block 000 (only live source of ignition
+        // advance) closes it.
+        val tripGroups = (tripPriority + cardGroups).distinct()
+            .sortedBy { if (it == 0) Int.MAX_VALUE else it }
         if (tripGroups.isEmpty()) return
 
         // Real adapter: the session loop streams measurements continuously

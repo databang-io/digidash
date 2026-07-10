@@ -1,6 +1,9 @@
 package io.databang.digidash.ui.tech
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -52,6 +55,7 @@ fun TechScreen(
     onToggleCaptureRaw: (Boolean) -> Unit,
     onToggleReadOnly: (Boolean) -> Unit,
     onOpenCaptureWizard: () -> Unit,
+    onTogglePin: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -81,7 +85,7 @@ fun TechScreen(
         }
         item { RemoteRepoCard(state, onRemoteRepo) }
         items(state.techGroups, key = { it.group }) { group ->
-            RawGroupCard(group)
+            RawGroupCard(group, state.pinnedCards, onTogglePin)
         }
         if (state.techGroups.isEmpty()) {
             item {
@@ -303,7 +307,11 @@ private fun RemoteRepoCard(
 }
 
 @Composable
-private fun RawGroupCard(group: TechGroup) {
+private fun RawGroupCard(
+    group: TechGroup,
+    pinned: Set<String> = emptySet(),
+    onTogglePin: (String) -> Unit = {},
+) {
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
@@ -343,6 +351,19 @@ private fun RawGroupCard(group: TechGroup) {
                         style = MaterialTheme.typography.bodyLarge,
                         fontFamily = FontFamily.Monospace,
                     )
+                    // VCDS-style pin: check to show this zone as a Dash tile.
+                    androidx.compose.material3.IconToggleButton(
+                        checked = m.key in pinned,
+                        onCheckedChange = { onTogglePin(m.key) },
+                    ) {
+                        androidx.compose.material3.Icon(
+                            imageVector = if (m.key in pinned) Icons.Filled.Star
+                            else Icons.Filled.StarBorder,
+                            contentDescription = "Show on dashboard",
+                            tint = if (m.key in pinned) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
