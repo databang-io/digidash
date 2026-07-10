@@ -228,7 +228,7 @@ object Kwp1281Protocol {
                     Integer.toBinaryString(mwb and rec.nwb).padStart(8, '0')
                 else -> headerBodyValue(rec, mwb)?.let { formatNumber(it) } ?: "$mwb"
             }
-            RawField(index = i + 1, raw = display, wire = mwb?.toString())
+            RawField(index = i + 1, raw = display, wire = mwb?.toString(), formula = rec.formula)
         }
     }
 

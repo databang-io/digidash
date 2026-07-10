@@ -38,6 +38,12 @@ class DebugBridge(
         val client = container.deepObdClient
         sessionHolder.scope.launch {
             when (cmd) {
+                "demo" -> {
+                    // Switch to the fake backend and connect (desk testing).
+                    container.useRealBackend = false
+                    val ok = sessionHolder.session.connect(ConnectionConfig(useFakeBackend = true))
+                    Log.i(TAG, "demo connect -> $ok")
+                }
                 "connectbare" -> {
                     // h4 test precondition: client-direct connect — transport +
                     // probe + session (ident pump + keep-alive) with NO DTC read,

@@ -10,7 +10,7 @@
  "source": {
   "type": "lbl-inferred",
   "confidence": "high",
-  "notes": "PROVENANCE POLICY (see CLAUDE.md guardrails): every field note starts with its source class (MEASURED on this car / MANUAL page / label-<file> sibling / INFERRED). No unit is displayed unless the conversion is calibrated (>=2 anchors or authoritative doc). Groups 001-004 zone semantics: MANUAL (ed. 04.1993, prog level >=1390) — not yet readable on the wire (0x29 returns a static legacy table; see docs/Next-Garage-Session.md). Group 000 = the live 0x12->0xF4 block, zones per sibling label 037906023 cross-checked live (no official 024 label exists; the 024-AB redirect was never finished per clubgti). Battery card = adapter FC telegram x0.1V (SOURCE docs/DeepOBD-Observed-API.md). Timing specs: MANUAL — check 4-8° BTDC @2000-2500 in basic setting, set 6±1°; full advance 35-45° @2800; idle 770-870; CO 0.2-1.2%."
+  "notes": "PROVENANCE POLICY (see CLAUDE.md guardrails): every field note starts with its source class (MEASURED on this car / MANUAL page / label-<file> sibling / INFERRED). No unit is displayed unless the conversion is calibrated (>=2 anchors or authoritative doc). Groups 001-004 zone semantics: MANUAL (ed. 04.1993, prog level >=1390) — not yet readable on the wire (0x29 returns a static legacy table; see docs/Next-Garage-Session.md). Group 000 = the live 0x12->0xF4 block, zones per sibling label 037906023 cross-checked live (no official 024 label exists; the 024-AB redirect was never finished per clubgti). Battery card = adapter FC telegram x0.1V (SOURCE docs/DeepOBD-Observed-API.md). Timing specs: MANUAL — check 4-8° BTDC @2000-2500 in basic setting, set 6±1°; full advance 35-45° @2800; idle 770-870; CO 0.2-1.2%. IGNITION TIMING: read in BASIC SETTINGS (0x28) from group 001 per the manual (prog level >=1390; ours 1576), NOT from 0x29 measurement blocks. The normal 0x29 group-001 header we captured is rpm/coolant/lambda/bits; the 0x28 basic-settings group-001 header is expected to expose the ignition-angle zone (wire formula 0x83/0x8F) — to be captured live."
  },
  "compatibility": {
   "vehicle_notes": "VW T3 home conversion, engine side 2E, drivetrain side JX (flywheel/clutch/bellhousing/gearbox). Do not assume Golf 3 flywheel timing marks.",
@@ -134,21 +134,15 @@
     },
     {
      "index": 8,
-     "key": "ignition_advance",
-     "name": "Ignition advance",
-     "unit": "°BTDC",
+     "key": "raw_000_8",
+     "name": "Zone 8 (raw)",
+     "unit": "",
      "value_type": "number",
      "formula": {
-      "type": "scale_offset",
-      "scale": 0.5,
-      "offset": -21.0
+      "type": "raw"
      },
-     "confidence": "medium",
-     "notes": "FORMULA (raw-42)*0.5 °BTDC — anchors: MEASURED engine-off raw≈0x2A -> 0°; held ~3000 -> 35-40° vs MANUAL p68 full-advance 35-45° @2800 (fuzzy rpm); label z8 obs 048 -> 3° idle. Verify with a timing light before trusting for adjustment.",
-     "display": {
-      "trip_card": true,
-      "order": 80
-     }
+     "confidence": "low",
+     "notes": "SOURCE: none. Earlier \"ignition advance (raw-42)*0.5\" was a garage-fitted guess — RETRACTED. Per the workshop manual, ignition timing is read in BASIC SETTINGS from group 001, not from measurement blocks."
     },
     {
      "index": 9,

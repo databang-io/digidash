@@ -27,6 +27,7 @@ class DefaultMeasurementInterpreter : MeasurementInterpreter {
             interpretField(
                 raw = block.fields.find { it.index == index }?.raw,
                 wire = block.fields.find { it.index == index }?.wire,
+                formula = block.fields.find { it.index == index }?.formula,
                 spec = group?.field(index),
                 group = block.group,
                 index = index,
@@ -43,14 +44,19 @@ class DefaultMeasurementInterpreter : MeasurementInterpreter {
     private fun interpretField(
         raw: String?,
         wire: String? = null,
+        formula: Int? = null,
         spec: EcuField?,
         group: Int,
         index: Int,
         timestampMillis: Long,
     ): InterpretedMeasurement {
-        val key = spec?.key ?: "raw_${EcuModel.groupKey(group)}_$index"
-        val name = spec?.name ?: "Field $index"
-        val unit = spec?.unit.orEmpty()
+        // Wire self-describes: an ignition-angle formula (0x83/0x8F) IS the
+        // ignition advance, overriding the model's static per-index name — the
+        // basic-settings group-001 header differs from the normal 0x29 one.
+        val angle = formula == 0x83 || formula == 0x8F
+        val key = if (angle) "ignition_advance" else spec?.key ?: "raw_${EcuModel.groupKey(group)}_$index"
+        val name = if (angle) "Ignition advance" else spec?.name ?: "Field $index"
+        val unit = if (angle) "°" else spec?.unit.orEmpty()
 
         if (raw == null || raw.isBlank()) {
             return InterpretedMeasurement(

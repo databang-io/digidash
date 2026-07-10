@@ -43,6 +43,9 @@ data class RawField(
     /** True wire byte(s) when [raw] is already an interpreted value
      *  (header+body zones: the MWb byte; triplets: "a/b"). Rule 10. */
     val wire: String? = null,
+    /** KW1281 formula id from the group header (self-describes the zone's
+     *  physical quantity — authoritative over the model's static naming). */
+    val formula: Int? = null,
 ) {
     /** Numeric view of the raw value, or null when the ECU sent text. */
     val numeric: Double? = raw.trim().toDoubleOrNull()
