@@ -13,7 +13,7 @@ OUT="$REPO/samples/deepobd/kkl-dumps/$(date +%Y%m%d-%H%M%S)"
 # --- prerequisites -----------------------------------------------------------
 if ! command -v dotnet >/dev/null; then
   echo "dotnet manquant. Installe le SDK puis relance :"
-  echo "  sudo dnf install dotnet-sdk-8.0        # Fedora"
+  echo "  sudo dnf install dotnet-sdk-10.0       # Fedora (kw1281test cible .NET 10)"
   exit 1
 fi
 if [ ! -d "$TOOL_DIR" ]; then
@@ -21,7 +21,7 @@ if [ ! -d "$TOOL_DIR" ]; then
   git clone --depth 1 https://github.com/gmenounos/kw1281test.git "$TOOL_DIR" || exit 1
 fi
 echo "== build =="
-(cd "$TOOL_DIR" && dotnet build -v quiet) || exit 1
+dotnet build "$TOOL_DIR/kw1281test.csproj" -v quiet || exit 1
 
 # --- port --------------------------------------------------------------------
 PORT="${1:-}"
@@ -40,7 +40,7 @@ run() { # run <label> <timeout_s> <command...>
   local label="$1" tmo="$2"; shift 2
   echo ""
   echo "== $label : kw1281test $PORT $BAUD 1 $* =="
-  (cd "$TOOL_DIR" && rm -f KW1281Test.log && timeout "$tmo" dotnet run --no-build -- "$PORT" "$BAUD" 1 "$@")
+  (cd "$TOOL_DIR" && rm -f KW1281Test.log && timeout "$tmo" dotnet run --project "$TOOL_DIR" --no-build -- "$PORT" "$BAUD" 1 "$@")
   if [ -f "$TOOL_DIR/KW1281Test.log" ]; then
     cp "$TOOL_DIR/KW1281Test.log" "$OUT/${label}.log"
     echo "   -> $OUT/${label}.log ($(wc -l < "$OUT/${label}.log") lignes)"
@@ -54,7 +54,7 @@ BAUD=""
 for b in 9600 10400 1200; do
   echo ""
   echo "== essai baud $b (ReadIdent) =="
-  (cd "$TOOL_DIR" && rm -f KW1281Test.log && timeout 40 dotnet run --no-build -- "$PORT" "$b" 1 ReadIdent)
+  (cd "$TOOL_DIR" && rm -f KW1281Test.log && timeout 40 dotnet run --project "$TOOL_DIR" --no-build -- "$PORT" "$b" 1 ReadIdent)
   if [ -f "$TOOL_DIR/KW1281Test.log" ] && grep -qiE "037906024|DIGIFANT" "$TOOL_DIR/KW1281Test.log"; then
     BAUD="$b"
     cp "$TOOL_DIR/KW1281Test.log" "$OUT/ident-baud$b.log"
