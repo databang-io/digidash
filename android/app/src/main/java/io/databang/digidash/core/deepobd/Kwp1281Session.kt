@@ -361,9 +361,14 @@ class Kwp1281Session(
     }
 
     fun readDtc(): Result<List<RawDtc>> = runCatching {
-        // The ECU returns all stored codes in a single 0xFC block; deliver on the
-        // first response rather than waiting for an ACK that may never come.
-        val resp = exchange(Kwp1281Protocol.TITLE_DTC_REQUEST, ByteArray(0))
+        // KaPoder/blafusel pattern: the ECU may spread codes over SEVERAL 0xFC
+        // blocks and signals "no more" with an ACK — collect until that ACK
+        // (delivering on the first block would drop codes beyond the first
+        // block on ECUs with many stored faults).
+        val resp = exchange(Kwp1281Protocol.TITLE_DTC_REQUEST, ByteArray(0),
+            keepAcks = true,
+            terminal = { it.title == Kwp1281Protocol.TITLE_ACK },
+            giveUpBlocks = 8)
         resp.filter { it.title == Kwp1281Protocol.TITLE_DTC_RESPONSE }
             .flatMap { Kwp1281Protocol.decodeDtcResponse(it.data) }
     }

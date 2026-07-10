@@ -73,7 +73,7 @@ object Kwp1281Protocol {
             22 -> 0.001 * a * b                       // ms
             23 -> a * b / 256.0                       // %
             24 -> 0.001 * a * b                       // A
-            25 -> (256 * b + a) / 180.0               // g/s
+            25 -> (256 * b + a) / 180.0 // DISPUTED: KaPoder uses 1.421*b + a/182; no authority — unused by the 2E               // g/s
             26 -> (b - a).toDouble()                  // °C
             27 -> (b - 128) * a * 0.01                // deg (SIGNED)
             28 -> (b - a).toDouble()
@@ -87,7 +87,7 @@ object Kwp1281Protocol {
             36 -> (a * 256 + b) * 10.0                 // km
             37 -> b.toDouble()
             38 -> (b - 128) * a * 0.001                // deg k/w
-            39 -> a * b / 255.0                        // mg/h
+            39 -> a * b / 255.0 // DISPUTED: KaPoder divides by 256; unused by the 2E                        // mg/h
             40 -> (a * 255 + b - 4000) * 0.1           // A
             41 -> (a * 255 + b).toDouble()             // Ah
             42 -> (a * 255 + b - 4000) * 0.1           // kW
