@@ -202,6 +202,7 @@ object Kwp1281Protocol {
         0x98 -> a * b * 0.025
         0x99 -> (b - 128) * a / 255.0
         0x9B -> a * b * 0.01 - 90
+        0x9F -> ((b - 127) * 256 + a) * 0.1   // °C (klinelib cpp:2372)
         else -> if (k in 1..0x7F) Kw1281Field(k, a, b).value() else null
     }
 
@@ -213,7 +214,7 @@ object Kwp1281Protocol {
         0x85, 0x8A -> "V"
         0x86 -> "km/h"
         0x89 -> "ms"
-        0x8C, 0x95 -> "°C"
+        0x8C, 0x95, 0x9F -> "°C"
         0x90 -> "l/h"
         0x96 -> "g/s"
         0x98 -> "mg"
@@ -247,6 +248,9 @@ object Kwp1281Protocol {
      * 3 bytes: two code bytes + a status byte. The 5-digit code is
      * `hi*256 + lo` (rendered zero-padded to 5 digits).
      */
+    // ASSUMPTION (documented): native 5-digit VAG codes only. OBD-range codes
+    // (0x4000-0x7FFF -> P/C/B/U, klinelib cpp:746/786) are not expected from
+    // this 1992 ECU and are rendered as their numeric value if ever seen.
     fun decodeDtcResponse(data: ByteArray): List<RawDtc> {
         val dtcs = ArrayList<RawDtc>()
         var i = 0
@@ -259,7 +263,9 @@ object Kwp1281Protocol {
             dtcs.add(
                 RawDtc(
                     code = codeNum.toString().padStart(5, '0'),
-                    statusRaw = "%02d-%02d".format(status shr 4, status and 0x0F),
+                    // SOURCED gmenounos FaultCodesBlock.cs:48-50: status1 = byte&0x7F
+                    // (opaque), status2 = (byte>>7)*10 (sporadic flag rendered VAG-style).
+                    statusRaw = "%02d-%02d".format(status and 0x7F, (status shr 7) * 10),
                     statusByte = status,
                 )
             )

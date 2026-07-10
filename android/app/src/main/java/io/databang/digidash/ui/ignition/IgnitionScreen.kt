@@ -124,7 +124,7 @@ private fun WarningCard() {
     }
 }
 
-private const val OPERATING_TEMP = 80.0
+private const val OPERATING_TEMP = 85.0 // manual p.36: adjust-mode bit requires coolant >= 85 °C
 
 @Composable
 private fun WarmUpCard(state: AppUiState) {

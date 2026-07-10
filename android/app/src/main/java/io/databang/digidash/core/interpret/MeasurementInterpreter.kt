@@ -55,8 +55,11 @@ class DefaultMeasurementInterpreter : MeasurementInterpreter {
         // basic-settings group-001 header differs from the normal 0x29 one.
         val angle = formula == 0x83 || formula == 0x8F
         val key = if (angle) "ignition_advance" else spec?.key ?: "raw_${EcuModel.groupKey(group)}_$index"
-        val name = if (angle) "Ignition advance" else spec?.name ?: "Field $index"
+        val name = if (angle) "Ignition advance (wire, unverified)" else spec?.name ?: "Field $index"
         val unit = if (angle) "°" else spec?.unit.orEmpty()
+        // 0x83/0x8F are klinelib-only formulas: never inherit the model index's
+        // confidence — force low so the UI badge always shows (guardrail).
+        val forcedLowConf = angle
 
         if (raw == null || raw.isBlank()) {
             return InterpretedMeasurement(
@@ -74,7 +77,8 @@ class DefaultMeasurementInterpreter : MeasurementInterpreter {
             rawString = raw, wireRaw = wire, value = value,
             displayValue = display, unit = unit,
             status = statusOf(value, spec?.thresholds),
-            confidence = spec?.confidence, timestampMillis = timestampMillis,
+            confidence = if (forcedLowConf) "low" else spec?.confidence,
+            timestampMillis = timestampMillis,
         )
     }
 

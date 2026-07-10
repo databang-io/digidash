@@ -543,11 +543,15 @@ class Kwp1281Session(
     }
 
     fun readDtc(): Result<List<RawDtc>> = runCatching {
-        // MEASURED on this ECU: all stored codes arrive in a single 0xFC block
-        // and the trailing ACK may never come — deliver on the first response.
-        // KNOWN LIMIT: an ECU with >4 stored faults may spread them over more
-        // 0xFC blocks (KaPoder loops until ACK); revisit live if >4 ever occur.
-        val resp = exchange(Kwp1281Protocol.TITLE_DTC_REQUEST, ByteArray(0))
+        // SOURCED (gmenounos KW1281Dialog.cs:357-375, klinelib cpp:582-670):
+        // faults may span several 0xFC blocks; collect until the terminating
+        // ACK (each 0xFC is ACKed by the loop's keep-alive turn). The give-up
+        // path still delivers whatever was collected, so an ECU that never
+        // sends the trailing ACK (seen live) cannot regress to zero faults.
+        val resp = exchange(Kwp1281Protocol.TITLE_DTC_REQUEST, ByteArray(0),
+            keepAcks = true,
+            terminal = { it.title == Kwp1281Protocol.TITLE_ACK || it.title == Kwp1281Protocol.TITLE_NO_DATA },
+            giveUpBlocks = 8)
         resp.filter { it.title == Kwp1281Protocol.TITLE_DTC_RESPONSE }
             .flatMap { Kwp1281Protocol.decodeDtcResponse(it.data) }
     }
@@ -627,9 +631,10 @@ class Kwp1281Session(
                 data.copyInto(it, 3)
                 it[it.size - 1] = 0x03
             }.also {
-                // KaPoder com-error recovery: a 0x00 sync block resets the block
-                // counter to 0 after transmission; the next RX re-adopts the
-                // ECU's counter (readBlock always does).
+                // SOURCED KaPoder obdisplay.cpp:1424-1441 (com-error recovery):
+                // after sending the 0x00 block his code sets block_counter = 0;
+                // the next RX re-adopts the ECU's counter (readBlock always
+                // does). Other refs treat 0x00 as ReadIdent — both observed.
                 if (title == 0x00) counter = 0
             }
         } else {
@@ -700,6 +705,12 @@ class Kwp1281Session(
         val blkCounter = logical[0].toInt() and 0xFF
         val title = logical[1].toInt() and 0xFF
         val data = if (len >= 3) logical.copyOfRange(2, len - 1) else ByteArray(0)
+        // SOURCED continuity check (gmenounos KW1281Dialog.cs:465-480 treats a
+        // counter mismatch as fatal): we LOG and reseed instead of tearing down
+        // until validated live — mismatches are visible in every capture.
+        if (counter != 0 && blkCounter != ((counter + 1) and 0xFF)) {
+            android.util.Log.i(TAG, "kwp: counter mismatch expected %02X got %02X".format((counter + 1) and 0xFF, blkCounter))
+        }
         counter = blkCounter
         return Block(blkCounter, title, data)
     }

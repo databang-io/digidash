@@ -4,7 +4,14 @@
 
 **Counts:** 38 consolidated fixes (from ~50 raw findings after merging duplicates): 1 critical, 12 high, 19 medium, 6 low. By subsystem: Ignition/Basic-Settings/Lambda 10, KWP1281 transport 6, KWP1281 decode 7, DTC handling 5, ECU-model provenance 10.
 
-Status legend: [ ] pending · [x] applied · [defer] deferred with reason
+Status legend — FINAL (2026-07-10): 36/38 APPLIED. Remaining 2, both wire-behavior
+changes gated on live validation (do not risk the proven link from the desk):
+- #22 5-baud odd parity: init is LIVE-PROVEN on this car; comment-level only until a garage test.
+- #33 echo-drain/length-cap rework: transport live-proven; revisit with a dump in hand.
+Deferred-then-applied: #4 (DTC loop-until-ACK, with a collected-blocks safety net),
+#5 (0x00 reset kept — it IS KaPoder-sourced; 0x55 branch still pending live capture),
+#21 (counter continuity: log+reseed now, fatal teardown after live validation),
+#23 (pacing knobs: unchanged defaults, tunable at the car).
 
 ## 1. [CRITICAL] Ignition / Basic Settings / Lambda (safety)
 

@@ -760,7 +760,7 @@ class AppViewModel(
         fun hasDtc(code: String) = dtcs.any { it.code == code }
 
         return IgnitionState(
-            coolantOk = coolant != null && coolant >= 80.0,
+            coolantOk = coolant != null && coolant >= 85.0, // manual p.36 zone-4 bit
             idleStable = rpm != null && rpm in 770.0..870.0, // manual p.33 spec
             batteryOk = battery != null && battery in 11.5..15.5, // manual p.16 + fault 00532 bounds
             // Manual p.4-5 fault table: only source-backed codes gate the checklist.

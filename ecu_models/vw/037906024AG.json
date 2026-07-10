@@ -25,7 +25,7 @@
     {
      "index": 1,
      "key": "intake_air_temp_raw",
-     "name": "Intake air temp (raw)",
+     "name": "Zone 1 raw (sibling: intake air temp)",
      "unit": "",
      "value_type": "number",
      "formula": {
@@ -37,7 +37,7 @@
     {
      "index": 2,
      "key": "co_pot",
-     "name": "CO fuel trim potentiometer",
+     "name": "Zone 2 raw (sibling: CO/mixture trim)",
      "unit": "",
      "value_type": "number",
      "formula": {
@@ -49,7 +49,7 @@
     {
      "index": 3,
      "key": "coolant_temp_raw",
-     "name": "Coolant temp (raw, INVERTED)",
+     "name": "Zone 3 raw (sibling: coolant, inverted)",
      "unit": "",
      "value_type": "number",
      "formula": {
@@ -98,7 +98,7 @@
     {
      "index": 5,
      "key": "lambda_raw_000",
-     "name": "Lambda (O2S) raw",
+     "name": "Zone 5 raw (sibling: O2S)",
      "unit": "",
      "value_type": "number",
      "formula": {
@@ -199,7 +199,7 @@
        "min": 6300
       }
      },
-     "notes": "Wire formula 0x8B (RPM): body byte interpolated over the 17-byte header table x NWb(26). SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then."
+     "notes": "INFERRED (not live-verified): Wire formula 0x8B (RPM): body byte interpolated over the 17-byte header table x NWb(26). SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then. | The header WAS captured live; the body/decode chain was not — treat every scale here as unconfirmed until a dump captures a real body."
     },
     {
      "index": 2,
@@ -229,7 +229,7 @@
        "min": 115
       }
      },
-     "notes": "Wire formula 0x8C (temperature): table-interpolated minus NWb(40) -> real °C. VCDS showed 90°C hot. SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then."
+     "notes": "INFERRED (not live-verified): Wire formula 0x8C (temperature): table-interpolated minus NWb(40) -> real °C. VCDS showed 90°C hot. SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then. | The header WAS captured live; the body/decode chain was not — treat every scale here as unconfirmed until a dump captures a real body."
     },
     {
      "index": 3,
@@ -241,7 +241,7 @@
       "type": "raw"
      },
      "confidence": "medium",
-     "notes": "Wire formula 0x85 with NWb=2 -> volts = body/128. VCDS showed 1.22 V with the probe disconnected (matches label 023 open-circuit 164-168 counts). Healthy control must fluctuate >0.3 V at warm idle (MANUAL p37). SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then.",
+     "notes": "INFERRED (not live-verified): Wire formula 0x85 with NWb=2 -> volts = body/128. VCDS showed 1.22 V with the probe disconnected (matches label 023 open-circuit 164-168 counts). Healthy control must fluctuate >0.3 V at warm idle (MANUAL p37). SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then. | The header WAS captured live; the body/decode chain was not — treat every scale here as unconfirmed until a dump captures a real body.",
      "display": {
       "trip_card": true,
       "order": 60
@@ -257,7 +257,7 @@
       "type": "raw"
      },
      "confidence": "medium",
-     "notes": "Wire formula 0x88 (switch bits, mask NWb=0xFF). MANUAL: 00000000 = check conditions satisfied. SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then."
+     "notes": "INFERRED (not live-verified): Wire formula 0x88 (switch bits, mask NWb=0xFF). MANUAL: 00000000 = check conditions satisfied. SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then. | The header WAS captured live; the body/decode chain was not — treat every scale here as unconfirmed until a dump captures a real body."
     }
    ]
   },
@@ -276,7 +276,7 @@
       "type": "raw"
      },
      "confidence": "medium",
-     "notes": "Wire formula 0x8B (RPM), same table as group 1. SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then."
+     "notes": "INFERRED (not live-verified): Wire formula 0x8B (RPM), same table as group 1. SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then. | The header WAS captured live; the body/decode chain was not — treat every scale here as unconfirmed until a dump captures a real body."
     },
     {
      "index": 2,
@@ -322,7 +322,7 @@
        "max": 10.5
       }
      },
-     "notes": "Wire formula 0x85 with NWb=24 -> volts = body x 24/256. VCDS showed 12.38 V engine off. Cross-check against the adapter FC voltage. SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then."
+     "notes": "INFERRED (not live-verified): Wire formula 0x85 with NWb=24 -> volts = body x 24/256. VCDS showed 12.38 V engine off. Cross-check against the adapter FC voltage. SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then. | The header WAS captured live; the body/decode chain was not — treat every scale here as unconfirmed until a dump captures a real body."
     },
     {
      "index": 4,
@@ -338,7 +338,7 @@
       "trip_card": true,
       "order": 40
      },
-     "notes": "Wire formula 0x8C (temperature) minus NWb(40). VCDS showed 40°C intake air. SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then."
+     "notes": "INFERRED (not live-verified): Wire formula 0x8C (temperature) minus NWb(40). VCDS showed 40°C intake air. SOURCE KLineKWP1281Lib header+body format, cross-checked against the VCDS-Lite screenshot on this car; wire header self-describes formula+scale (no calibration guessing). Live-unverified on OUR transport until the next garage session — confidence medium until then. | The header WAS captured live; the body/decode chain was not — treat every scale here as unconfirmed until a dump captures a real body."
     }
    ]
   },
@@ -351,13 +351,13 @@
      "index": 1,
      "key": "rpm_003",
      "name": "Engine speed (likely)",
-     "unit": "rpm",
+     "unit": "",
      "value_type": "number",
      "formula": {
       "type": "raw"
      },
      "confidence": "low",
-     "notes": "Zone 1 not documented in manual; likely engine speed"
+     "notes": "Zone 1 not documented in manual; likely engine speed [unit removed pending source: was \"rpm\"]"
     },
     {
      "index": 2,
@@ -461,7 +461,7 @@
    ]
   },
   "005": {
-   "label": "Engine speed / throttle angle / injection",
+   "label": "Group 005 (sibling-label inferred — unverified on this ECU)",
    "polling_priority": "garage",
    "fields": [
     {
@@ -473,19 +473,19 @@
      "formula": {
       "type": "raw"
      },
-     "confidence": "medium"
+     "confidence": "low"
     },
     {
      "index": 2,
      "key": "throttle_angle",
      "name": "Throttle valve angle",
-     "unit": "°",
+     "unit": "",
      "value_type": "number",
      "formula": {
       "type": "raw"
      },
-     "confidence": "medium",
-     "notes": "WOT >= 90°; 0.0° = open circuit to TPS; >=90° at idle = short to + in TPS wiring"
+     "confidence": "low",
+     "notes": "SOURCE label-sibling only. The MANUAL (p.40-41) gives NO absolute throttle angle — only \"must increase uniformly\". Former WOT>=90deg note removed (unsourced)."
     },
     {
      "index": 3,
@@ -507,7 +507,7 @@
      "formula": {
       "type": "raw"
      },
-     "confidence": "medium"
+     "confidence": "low"
     }
    ]
   },
@@ -519,23 +519,25 @@
      "index": 1,
      "key": "rpm_g6",
      "name": "Engine speed",
-     "unit": "rpm",
+     "unit": "",
      "value_type": "number",
      "formula": {
       "type": "raw"
      },
-     "confidence": "low"
+     "confidence": "low",
+     "notes": "[unit removed pending source: was \"rpm\"]"
     },
     {
      "index": 2,
      "key": "intake_air_temp_g6",
      "name": "Intake air temperature",
-     "unit": "°C",
+     "unit": "",
      "value_type": "number",
      "formula": {
       "type": "raw"
      },
-     "confidence": "low"
+     "confidence": "low",
+     "notes": "[unit removed pending source: was \"°C\"]"
     },
     {
      "index": 3,
@@ -569,12 +571,13 @@
      "index": 1,
      "key": "rpm_g9",
      "name": "Engine speed",
-     "unit": "rpm",
+     "unit": "",
      "value_type": "number",
      "formula": {
       "type": "raw"
      },
-     "confidence": "low"
+     "confidence": "low",
+     "notes": "[unit removed pending source: was \"rpm\"]"
     },
     {
      "index": 2,
@@ -620,12 +623,13 @@
      "index": 1,
      "key": "rpm_g10",
      "name": "Engine speed",
-     "unit": "rpm",
+     "unit": "",
      "value_type": "number",
      "formula": {
       "type": "raw"
      },
-     "confidence": "low"
+     "confidence": "low",
+     "notes": "[unit removed pending source: was \"rpm\"]"
     },
     {
      "index": 2,
@@ -671,12 +675,13 @@
      "index": 1,
      "key": "rpm_g11",
      "name": "Engine speed",
-     "unit": "rpm",
+     "unit": "",
      "value_type": "number",
      "formula": {
       "type": "raw"
      },
-     "confidence": "low"
+     "confidence": "low",
+     "notes": "[unit removed pending source: was \"rpm\"]"
     }
    ]
   }
