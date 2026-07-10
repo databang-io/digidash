@@ -136,7 +136,7 @@ object Kwp1281Protocol {
             val type = data[i].toInt() and 0xFF
             val a = data[i + 1].toInt() and 0xFF
             val b = data[i + 2].toInt() and 0xFF
-            fields.add(Kw1281Field(type, a, b).toRawField(index))
+            fields.add(Kw1281Field(type, a, b).toRawField(index).copy(wire = "$type:$a/$b"))
             i += 3
             index++
         }
@@ -228,7 +228,7 @@ object Kwp1281Protocol {
                     Integer.toBinaryString(mwb and rec.nwb).padStart(8, '0')
                 else -> headerBodyValue(rec, mwb)?.let { formatNumber(it) } ?: "$mwb"
             }
-            RawField(index = i + 1, raw = display)
+            RawField(index = i + 1, raw = display, wire = mwb?.toString())
         }
     }
 

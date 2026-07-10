@@ -26,6 +26,7 @@ class DefaultMeasurementInterpreter : MeasurementInterpreter {
         val measurements = (1..fieldCount).map { index ->
             interpretField(
                 raw = block.fields.find { it.index == index }?.raw,
+                wire = block.fields.find { it.index == index }?.wire,
                 spec = group?.field(index),
                 group = block.group,
                 index = index,
@@ -41,6 +42,7 @@ class DefaultMeasurementInterpreter : MeasurementInterpreter {
 
     private fun interpretField(
         raw: String?,
+        wire: String? = null,
         spec: EcuField?,
         group: Int,
         index: Int,
@@ -53,7 +55,7 @@ class DefaultMeasurementInterpreter : MeasurementInterpreter {
         if (raw == null || raw.isBlank()) {
             return InterpretedMeasurement(
                 key = key, name = name, group = group, fieldIndex = index,
-                rawString = raw, value = null,
+                rawString = raw, wireRaw = wire, value = null,
                 displayValue = "N/A", unit = unit,
                 status = MeasurementStatus.UNAVAILABLE,
                 confidence = spec?.confidence, timestampMillis = timestampMillis,
@@ -63,7 +65,7 @@ class DefaultMeasurementInterpreter : MeasurementInterpreter {
         val (value, display) = applyFormula(raw, spec)
         return InterpretedMeasurement(
             key = key, name = name, group = group, fieldIndex = index,
-            rawString = raw, value = value,
+            rawString = raw, wireRaw = wire, value = value,
             displayValue = display, unit = unit,
             status = statusOf(value, spec?.thresholds),
             confidence = spec?.confidence, timestampMillis = timestampMillis,

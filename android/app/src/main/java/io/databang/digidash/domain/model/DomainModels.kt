@@ -40,6 +40,9 @@ data class EcuIdentity(
 data class RawField(
     val index: Int,
     val raw: String,
+    /** True wire byte(s) when [raw] is already an interpreted value
+     *  (header+body zones: the MWb byte; triplets: "a/b"). Rule 10. */
+    val wire: String? = null,
 ) {
     /** Numeric view of the raw value, or null when the ECU sent text. */
     val numeric: Double? = raw.trim().toDoubleOrNull()
@@ -90,6 +93,8 @@ data class InterpretedMeasurement(
     val group: Int,
     val fieldIndex: Int,
     val rawString: String?,
+    /** Wire-level bytes preserved alongside the interpreted value (rule 10). */
+    val wireRaw: String? = null,
     val value: Double?,
     val displayValue: String,
     val unit: String,

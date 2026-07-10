@@ -323,7 +323,7 @@ private fun RawGroupCard(group: TechGroup) {
                         Text(m.name, style = MaterialTheme.typography.bodyMedium)
                         Row {
                             Text(
-                                "raw: ${m.rawString ?: "—"}",
+                                "raw: ${m.rawString ?: "—"}" + (m.wireRaw?.let { " · wire: $it" } ?: ""),
                                 style = MaterialTheme.typography.bodySmall,
                                 fontFamily = FontFamily.Monospace,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
