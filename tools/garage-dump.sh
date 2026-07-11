@@ -6,6 +6,7 @@
 # Usage:  tools/garage-dump.sh [seconds] [groups]
 #   e.g.  tools/garage-dump.sh 45 "0,1,2,3"
 set -u
+export PATH="$PATH:$HOME/Android/Sdk/platform-tools"
 T="${ADB_SERIAL:-348dfe79}"
 SECONDS_CAP="${1:-45}"
 GROUPS="${2:-0,1,2,3}"

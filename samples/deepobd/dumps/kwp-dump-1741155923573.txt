@@ -1,0 +1,4 @@
+# DigiDash KWP1281 raw group dump
+# ecu=[037906024AG, DIGIFANT 1.7        1576, PMC]
+# groups=[1000] seconds=45
+# each line: group <g> T=<title> [<data hex>]  (02=header, F4=body, 0A=refused)
