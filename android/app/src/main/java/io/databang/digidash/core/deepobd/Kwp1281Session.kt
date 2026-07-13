@@ -342,8 +342,12 @@ class Kwp1281Session(
                     if (pending != null) {
                         pending.response.offer(emptyList()); pending = null; collected.clear()
                     }
-                    if (misses == 2) resyncNeeded = true // one soft recovery first
-                    if (misses >= 4) { running = false; break }
+                    // DATA-DRIVEN (garage 2026-07): the 0x00 resync does NOT recover
+                    // this Digifant — every auto-resync was followed by a teardown
+                    // 6 s later. So DON'T resync on a brief silence; just ride it
+                    // out. Old ECUs at 1200 baud go quiet for several turns under
+                    // stream load — tear down only after a long silence.
+                    if (misses >= 10) { running = false; break }
                     runCatching { sendAck() }
                     continue
                 }
@@ -781,7 +785,7 @@ class Kwp1281Session(
         // until validated live — mismatches are visible in every capture.
         if (counter != 0 && blkCounter != ((counter + 1) and 0xFF)) {
             android.util.Log.i(TAG, "kwp: counter mismatch expected %02X got %02X".format((counter + 1) and 0xFF, blkCounter))
-            if (++consecutiveMismatches >= 2) resyncNeeded = true
+            consecutiveMismatches++  // logged only; auto-resync disabled (see above)
         } else {
             consecutiveMismatches = 0
         }
