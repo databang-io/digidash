@@ -95,6 +95,14 @@ private enum class Destination(
 
 @Composable
 fun DigiDashApp(container: AppContainer, sessionHolder: SessionHolder) {
+    // Mounted car display: keep the screen awake while DigiDash is shown, like
+    // Waze. Set on the composed view (reliable) — the window flag alone did not
+    // hold against a short system timeout on this tablet.
+    val keepOnView = androidx.compose.ui.platform.LocalView.current
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        keepOnView.keepScreenOn = true
+        onDispose { keepOnView.keepScreenOn = false }
+    }
     val viewModel: AppViewModel = viewModel(factory = AppViewModel.factory(container, sessionHolder))
     val state by viewModel.ui.collectAsState()
     val navController = rememberNavController()
