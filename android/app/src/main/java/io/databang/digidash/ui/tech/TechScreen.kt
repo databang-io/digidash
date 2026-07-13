@@ -315,23 +315,26 @@ private fun OverlayCard() {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { ctx.getSharedPreferences("digidash", android.content.Context.MODE_PRIVATE) }
     val candidates = listOf(
-        "rpm" to "Régime", "coolant_temp" to "Température", "battery_voltage" to "Batterie",
+        "rpm" to "Régime", "coolant_temp" to "Temp. eau", "battery_voltage" to "Batterie",
         "lambda_signal" to "Lambda", "injection_time" to "Injection", "throttle_angle" to "Papillon",
-        "intake_air_temp" to "Air adm.", "engine_load" to "Charge", "gps_speed" to "Vitesse GPS",
+        "intake_air_temp" to "Air adm.", "engine_load" to "Charge", "dtc_count" to "Défauts",
+        "gps_speed" to "Vitesse GPS",
     )
+    fun read(pref: String, def: String) = (prefs.getString(pref, def) ?: "")
+        .split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
     var selected by remember {
-        mutableStateOf(
-            (prefs.getString("overlay_gauges",
-                io.databang.digidash.core.overlay.GaugeOverlayService.DEFAULT_GAUGES)
-                ?: "").split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
-        )
+        mutableStateOf(read("overlay_gauges",
+            io.databang.digidash.core.overlay.GaugeOverlayService.DEFAULT_GAUGES))
+    }
+    var pillSelected by remember {
+        mutableStateOf(read("overlay_pill_gauges",
+            io.databang.digidash.core.overlay.GaugeOverlayService.DEFAULT_PILL_GAUGES))
     }
     var running by remember { mutableStateOf(io.databang.digidash.core.overlay.GaugeOverlayService.isRunning) }
 
-    fun persist(set: Set<String>) {
-        // keep the candidate order
+    fun persist(pref: String, set: Set<String>) {
         val ordered = candidates.map { it.first }.filter { it in set }
-        prefs.edit().putString("overlay_gauges", ordered.joinToString(",")).apply()
+        prefs.edit().putString(pref, ordered.joinToString(",")).apply()
         io.databang.digidash.core.overlay.GaugeOverlayService.refresh(ctx)
     }
 
@@ -364,14 +367,27 @@ private fun OverlayCard() {
                 "Tap la barre = replier en pastille · appui long = haut/bas.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("Jauges dans la barre :", style = MaterialTheme.typography.bodyMedium)
+            Text("Jauges (barre dépliée) :", style = MaterialTheme.typography.bodyMedium)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 candidates.forEach { (key, label) ->
                     androidx.compose.material3.FilterChip(
                         selected = key in selected,
                         onClick = {
                             selected = if (key in selected) selected - key else selected + key
-                            persist(selected)
+                            persist("overlay_gauges", selected)
+                        },
+                        label = { Text(label) },
+                    )
+                }
+            }
+            Text("Jauges prioritaires (visibles repliée) :", style = MaterialTheme.typography.bodyMedium)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                candidates.forEach { (key, label) ->
+                    androidx.compose.material3.FilterChip(
+                        selected = key in pillSelected,
+                        onClick = {
+                            pillSelected = if (key in pillSelected) pillSelected - key else pillSelected + key
+                            persist("overlay_pill_gauges", pillSelected)
                         },
                         label = { Text(label) },
                     )

@@ -40,9 +40,12 @@ class GaugeOverlayService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var windowManager: WindowManager
     private var barView: View? = null
-    private var pill: TextView? = null
+    private var pillBar: LinearLayout? = null
     private var collapsed = false
-    private val cells = mutableMapOf<String, Pair<TextView, TextView>>()
+    private val cells = mutableMapOf<String, TextView>()
+    private val pillCells = mutableMapOf<String, TextView>()
+    private var lastMap: Map<String, InterpretedMeasurement> = emptyMap()
+    private var lastDtc: Int? = null
 
     /** Which value-keys back a canonical gauge (first present wins). */
     private val fallbacks = mapOf(
@@ -50,22 +53,27 @@ class GaugeOverlayService : Service() {
         "coolant_temp" to listOf("coolant_temp", "coolant_temp_raw", "coolant_temp_000"),
     )
     private val shortLabels = mapOf(
-        "rpm" to "RPM", "coolant_temp" to "TEMP", "battery_voltage" to "BATT",
+        "rpm" to "RPM", "coolant_temp" to "EAU", "battery_voltage" to "BATT",
         "lambda_signal" to "LAMBDA", "gps_speed" to "SPD", "injection_time" to "INJ",
-        "throttle_angle" to "THR", "intake_air_temp" to "IAT", "engine_load" to "LOAD",
+        "throttle_angle" to "PAP", "intake_air_temp" to "AIR", "engine_load" to "CHG",
+        "dtc_count" to "DEF",
     )
 
-    /** User-chosen gauges (key -> label + fallback keys), read from prefs. */
-    private lateinit var layout: List<Pair<List<String>, String>>
+    /** Full-bar and collapsed-pill gauge lists (key -> label + fallback keys). */
+    private lateinit var layout: List<Triple<String, List<String>, String>>
+    private lateinit var pillLayout: List<Triple<String, List<String>, String>>
+
+    private fun listFrom(pref: String, default: String): List<Triple<String, List<String>, String>> {
+        val prefs = (application as DigiDashApplication).container.prefs
+        val keys = prefs.getString(pref, default)
+            ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+            ?.ifEmpty { null } ?: default.split(",")
+        return keys.map { k -> Triple(k, fallbacks[k] ?: listOf(k), shortLabels[k] ?: k.uppercase()) }
+    }
 
     private fun loadLayout() {
-        val prefs = (application as DigiDashApplication).container.prefs
-        val keys = prefs.getString(PREF_OVERLAY_GAUGES, DEFAULT_GAUGES)
-            ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
-            ?.ifEmpty { null } ?: DEFAULT_GAUGES.split(",")
-        layout = keys.map { k ->
-            (fallbacks[k] ?: listOf(k)) to (shortLabels[k] ?: k.uppercase())
-        }
+        layout = listFrom(PREF_OVERLAY_GAUGES, DEFAULT_GAUGES)
+        pillLayout = listFrom(PREF_OVERLAY_PILL_GAUGES, DEFAULT_PILL_GAUGES)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -88,7 +96,8 @@ class GaugeOverlayService : Service() {
             setPadding((8 * dp).toInt(), (4 * dp).toInt(), (8 * dp).toInt(), (4 * dp).toInt())
             gravity = Gravity.CENTER_VERTICAL
         }
-        layout.forEach { (_, label) ->
+        // Full bar: one labelled cell per configured gauge.
+        layout.forEach { (key, _, label) ->
             val cell = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_HORIZONTAL
@@ -98,8 +107,7 @@ class GaugeOverlayService : Service() {
             }
             val value = TextView(this).apply {
                 text = "—"; setTextColor(Color.WHITE); textSize = 17f
-                setTypeface(typeface, android.graphics.Typeface.BOLD)
-                gravity = Gravity.CENTER
+                setTypeface(typeface, android.graphics.Typeface.BOLD); gravity = Gravity.CENTER
             }
             val name = TextView(this).apply {
                 text = label; setTextColor(Color.argb(170, 255, 255, 255)); textSize = 9f
@@ -107,15 +115,25 @@ class GaugeOverlayService : Service() {
             }
             cell.addView(value); cell.addView(name)
             bar.addView(cell)
-            cells[label] = value to name
+            cells[key] = value
         }
-        // A tiny pill shown when collapsed (tap to expand); full bar hidden.
-        pill = TextView(this).apply {
-            text = "▪ DIGI"; setTextColor(Color.WHITE); textSize = 12f
-            setPadding((10 * dp).toInt(), (5 * dp).toInt(), (10 * dp).toInt(), (5 * dp).toInt())
+        // Collapsed pill: a compact row of the PRIORITY gauges (temp eau, défauts…)
+        // so the safety values stay visible while Waze is full-screen.
+        val pill = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            setPadding((8 * dp).toInt(), (4 * dp).toInt(), (8 * dp).toInt(), (4 * dp).toInt())
             visibility = View.GONE
         }
+        pillLayout.forEach { (key, _, label) ->
+            val tv = TextView(this).apply {
+                text = "$label —"; setTextColor(Color.WHITE); textSize = 13f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                setPadding((6 * dp).toInt(), 0, (6 * dp).toInt(), 0)
+            }
+            pill.addView(tv); pillCells[key] = tv
+        }
         bar.addView(pill)
+        pillBar = pill
         // Tap = collapse/expand (keep Waze fully visible on demand);
         // long-press = flip top<->bottom edge.
         bar.setOnClickListener { toggleCollapsed() }
@@ -152,7 +170,7 @@ class GaugeOverlayService : Service() {
         // Show only the pill when collapsed, only the gauge cells when expanded.
         for (i in 0 until bar.childCount) {
             val c = bar.getChildAt(i)
-            c.visibility = if ((c === pill) == collapsed) View.VISIBLE else View.GONE
+            c.visibility = if ((c === pillBar) == collapsed) View.VISIBLE else View.GONE
         }
         currentParams?.let { p ->
             p.width = if (collapsed) WindowManager.LayoutParams.WRAP_CONTENT
@@ -165,21 +183,36 @@ class GaugeOverlayService : Service() {
 
     private fun observeMeasurements() {
         val session = (application as DigiDashApplication).sessionHolder.session
-        scope.launch {
-            session.measurements.collectLatest { map -> render(map) }
-        }
+        scope.launch { session.measurements.collectLatest { lastMap = it; renderAll() } }
+        scope.launch { session.dtcCount.collectLatest { lastDtc = it; renderAll() } }
     }
 
-    private fun render(map: Map<String, InterpretedMeasurement>) {
-        layout.forEach { (keys, label) ->
-            val (valueTv, _) = cells[label] ?: return@forEach
-            val m = keys.firstNotNullOfOrNull { map[it] }
-            if (m == null) {
-                valueTv.text = "N/A"; valueTv.setTextColor(Color.argb(140, 255, 255, 255))
-            } else {
-                valueTv.text = m.displayValue + if (m.unit.isNotBlank()) " ${m.unit}" else ""
-                valueTv.setTextColor(colorFor(m.status))
+    private fun renderAll() {
+        layout.forEach { (key, keys, _) -> renderCell(cells[key], key, keys, withUnit = true) }
+        pillLayout.forEach { (key, keys, _) -> renderCell(pillCells[key], key, keys, withUnit = true, pill = true) }
+    }
+
+    private fun renderCell(
+        tv: TextView?, key: String, keys: List<String>, withUnit: Boolean, pill: Boolean = false,
+    ) {
+        tv ?: return
+        val prefix = if (pill) (shortLabels[key] ?: key.uppercase()) + " " else ""
+        if (key == "dtc_count") {
+            val n = lastDtc
+            when {
+                n == null -> { tv.text = "${prefix}N/A"; tv.setTextColor(Color.argb(140, 255, 255, 255)) }
+                n == 0 -> { tv.text = "${prefix}0"; tv.setTextColor(Color.rgb(0x66, 0xBB, 0x6A)) }
+                else -> { tv.text = "$prefix⚠$n"; tv.setTextColor(Color.rgb(0xFF, 0x5A, 0x5A)) }
             }
+            return
+        }
+        val m = keys.firstNotNullOfOrNull { lastMap[it] }
+        if (m == null) {
+            tv.text = "${prefix}N/A"; tv.setTextColor(Color.argb(140, 255, 255, 255))
+        } else {
+            val v = m.displayValue + if (withUnit && m.unit.isNotBlank()) " ${m.unit}" else ""
+            tv.text = prefix + v
+            tv.setTextColor(colorFor(m.status))
         }
     }
 
@@ -224,8 +257,11 @@ class GaugeOverlayService : Service() {
         private const val CHANNEL = "digidash_overlay"
         private const val NOTIF_ID = 43
         const val PREF_OVERLAY_GAUGES = "overlay_gauges"
-        /** Default bar (no GPS speed — Waze already shows speed). */
+        const val PREF_OVERLAY_PILL_GAUGES = "overlay_pill_gauges"
+        /** Default full bar (no GPS speed — Waze already shows speed). */
         const val DEFAULT_GAUGES = "rpm,coolant_temp,battery_voltage,lambda_signal"
+        /** Default collapsed pill = the safety priorities: water temp + faults. */
+        const val DEFAULT_PILL_GAUGES = "coolant_temp,dtc_count"
 
         /** Apply a config change: restart the bar if it is currently showing. */
         fun refresh(context: Context) { if (isRunning) { stop(context); start(context) } }
