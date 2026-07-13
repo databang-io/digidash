@@ -315,6 +315,12 @@ class Kwp1281Session(
     private fun startLoop() {
         running = true
         loopThread = Thread {
+            // Timing-sensitive K-line reads: nudge the thread above default so UI
+            // rendering doesn't starve it. THREAD_PRIORITY_FOREGROUND (-2) is
+            // the safe ceiling for a normal app (URGENT_* can be refused/unsafe).
+            runCatching {
+                android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_FOREGROUND)
+            }
             var pending: PendingCommand? = null
             val collected = mutableListOf<Block>()
             var misses = 0

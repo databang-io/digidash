@@ -334,14 +334,12 @@ class DiagnosticSessionRepository(
                         }
                     }
                 }
-                launch {
-                    // Battery via the adapter's FC telegram; a queued command
-                    // that preempts the stream at a body boundary (~10 s cadence).
-                    while (isActive) {
-                        delay(10_000)
-                        deepObd.adapterVoltage()?.let { volts -> publishBatteryVoltage(volts) }
-                    }
-                }
+                // NOTE: the adapter-FC voltage telegram was REMOVED here. The raw
+                // byte capture (2026-07) proved it: sending 82 F1 F1 FC FC mid-
+                // session (between KW1281 blocks) desyncs the ECU dialog and it
+                // goes silent -> disconnection, several times per minute. Battery
+                // voltage now comes from the ECU itself (group 2 zone 3, decoded
+                // and VCDS-matched), so the adapter telegram is not needed.
                 deepObd.measurementFlow.collect { block ->
                     val interpreted = interpreter.interpret(block, model)
                     _measurements.value = _measurements.value +

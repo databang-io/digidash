@@ -54,6 +54,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Mounted car display: keep the screen on while DigiDash is in front
+        // (no sleep, no lock). Cleared automatically when another app comes up.
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val app = application as DigiDashApplication
         setContent {
             DigiDashTheme {
