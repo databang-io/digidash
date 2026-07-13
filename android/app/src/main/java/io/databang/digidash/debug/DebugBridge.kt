@@ -73,6 +73,11 @@ class DebugBridge(
                     Log.i(TAG, "dumpgroups DONE -> ${file.absolutePath}")
                     Log.i(TAG, "pull: adb pull ${file.absolutePath}")
                 }
+                "capture" -> {
+                    val on = intent.getStringExtra("state") != "off"
+                    container.captureRawTraffic = on
+                    Log.i(TAG, "capture raw traffic = $on (applies on next connect)")
+                }
                 "resync" -> {
                     client.requestResync()
                     Log.i(TAG, "resync requested (0x00 + counter reset + ident pump)")
