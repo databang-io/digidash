@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -76,6 +77,7 @@ fun TechScreen(
             item { LiveSessionCard(state, onToggleCaptureRaw, onToggleReadOnly) }
         }
         item { AlertsCard(state, onToggleAlerts, onResetPeaks) }
+        item { OverlayCard() }
         if (!state.useRealBackend) {
             item { ScenarioCard(state.scenario, onScenario) }
         }
@@ -301,6 +303,79 @@ private fun RemoteRepoCard(
                 androidx.compose.material3.TextButton(
                     onClick = { onRemoteRepo(url, state.remoteRepoEnabled) },
                 ) { Text("Save URL") }
+            }
+        }
+    }
+}
+
+/** Floating gauge-bar (system overlay over Waze/any app) toggle + gauge picker. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun OverlayCard() {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember { ctx.getSharedPreferences("digidash", android.content.Context.MODE_PRIVATE) }
+    val candidates = listOf(
+        "rpm" to "Régime", "coolant_temp" to "Température", "battery_voltage" to "Batterie",
+        "lambda_signal" to "Lambda", "injection_time" to "Injection", "throttle_angle" to "Papillon",
+        "intake_air_temp" to "Air adm.", "engine_load" to "Charge", "gps_speed" to "Vitesse GPS",
+    )
+    var selected by remember {
+        mutableStateOf(
+            (prefs.getString("overlay_gauges",
+                io.databang.digidash.core.overlay.GaugeOverlayService.DEFAULT_GAUGES)
+                ?: "").split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
+        )
+    }
+    var running by remember { mutableStateOf(io.databang.digidash.core.overlay.GaugeOverlayService.isRunning) }
+
+    fun persist(set: Set<String>) {
+        // keep the candidate order
+        val ordered = candidates.map { it.first }.filter { it in set }
+        prefs.edit().putString("overlay_gauges", ordered.joinToString(",")).apply()
+        io.databang.digidash.core.overlay.GaugeOverlayService.refresh(ctx)
+    }
+
+    Card {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Barre flottante (par-dessus Waze / autres apps)",
+                style = MaterialTheme.typography.titleMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Switch(checked = running, onCheckedChange = { on ->
+                    if (on) {
+                        if (!android.provider.Settings.canDrawOverlays(ctx)) {
+                            ctx.startActivity(android.content.Intent(
+                                android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                android.net.Uri.parse("package:${ctx.packageName}"))
+                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                        } else {
+                            io.databang.digidash.core.overlay.GaugeOverlayService.start(ctx)
+                            running = true
+                        }
+                    } else {
+                        io.databang.digidash.core.overlay.GaugeOverlayService.stop(ctx)
+                        running = false
+                    }
+                })
+                Spacer(Modifier.width(8.dp))
+                Text(if (running) "Barre affichée" else "Barre masquée",
+                    style = MaterialTheme.typography.bodyMedium)
+            }
+            Text("Autorise « Afficher par-dessus les autres apps » si demandé. " +
+                "Tap la barre = replier en pastille · appui long = haut/bas.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Jauges dans la barre :", style = MaterialTheme.typography.bodyMedium)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                candidates.forEach { (key, label) ->
+                    androidx.compose.material3.FilterChip(
+                        selected = key in selected,
+                        onClick = {
+                            selected = if (key in selected) selected - key else selected + key
+                            persist(selected)
+                        },
+                        label = { Text(label) },
+                    )
+                }
             }
         }
     }

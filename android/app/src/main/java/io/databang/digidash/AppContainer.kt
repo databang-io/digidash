@@ -116,6 +116,7 @@ class AppContainer(private val appContext: Context) {
         const val PREF_CARD_ORDER = "dashboard_card_order"
         const val PREF_CARD_SIZES = "dashboard_card_sizes"
         const val PREF_PINNED_CARDS = "dashboard_pinned_cards"
+        const val PREF_OVERLAY_GAUGES = "overlay_gauges"
         const val PREF_ALERTS_ENABLED = "alerts_enabled"
         const val PREF_CAPTURE_RAW = "capture_raw_traffic"
         const val PREF_READ_ONLY = "read_only_mode"
